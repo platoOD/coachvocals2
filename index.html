@@ -1362,7 +1362,7 @@
 <div class="share-notification" id="share-notification">✅ Посилання скопійовано!</div>
 
 <!-- Soundfont library -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.9.17/Tone.js"></script>
+<script src="https://unpkg.com/tone@14.9.17/build/Tone.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
 
 <script>
@@ -1563,13 +1563,17 @@
             playOscillatorNote(noteName, duration);
             return;
         }
-        try {
-            ensureToneStarted();
-            state.sampler.triggerAttackRelease(getToneNote(noteName), Math.max(0.03, duration));
-        } catch (e) {
-            console.warn('Tone.Sampler playback error:', e);
-            playOscillatorNote(noteName, duration);
-        }
+        const sampler = state.sampler;
+        const toneNote = getToneNote(noteName);
+        ensureToneStarted().then(() => {
+            if (state.sampler !== sampler || !state.instrumentLoaded) return;
+            try {
+                sampler.triggerAttackRelease(toneNote, Math.max(0.03, duration));
+            } catch (e) {
+                console.warn('Tone.Sampler playback error:', e);
+                playOscillatorNote(noteName, duration);
+            }
+        }).catch(() => playOscillatorNote(noteName, duration));
     }
 
     function startContinuousSamplerNote(noteName, groupId) {
@@ -1578,18 +1582,24 @@
             if (result) state.activeNotes.set(groupId, result);
             return;
         }
-        try {
-            ensureToneStarted();
-            const toneNote = getToneNote(noteName);
-            state.sampler.triggerAttack(toneNote);
-            state.activeNotes.set(groupId, {
+        const sampler = state.sampler;
+        const toneNote = getToneNote(noteName);
+        ensureToneStarted().then(() => {
+            if (state.sampler !== sampler || !state.instrumentLoaded) return;
+            try {
+                sampler.triggerAttack(toneNote);
+                state.activeNotes.set(groupId, {
                 note: toneNote,
                 stop: () => { try { state.sampler?.triggerRelease(toneNote); } catch (e) {} }
             });
-        } catch (e) {
+            } catch (e) {
+                const result = createOscillatorNode(noteName, true);
+                if (result) state.activeNotes.set(groupId, result);
+            }
+        }).catch(() => {
             const result = createOscillatorNode(noteName, true);
             if (result) state.activeNotes.set(groupId, result);
-        }
+        });
     }
 
     // ============================================================
@@ -3336,6 +3346,10 @@
 
     if (state.masterGain) {
         state.masterGain.gain.value = state.volume * 20.0;
+    }
+
+    if (state.sampler) {
+        state.sampler.volume.value = getVolumeDb();
     }
 
     updateVolumeUI(percent);
