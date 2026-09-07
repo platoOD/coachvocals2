@@ -2438,7 +2438,7 @@
                 lineEl.setAttribute('x2', x2);
                 lineEl.setAttribute('y2', y2);
                 lineEl.setAttribute('stroke', 'currentColor');
-                lineEl.setAttribute('stroke-width', '2.5');
+                lineEl.setAttribute('stroke-width', '1');
                 lineEl.setAttribute('stroke-linecap', 'round');
                 lineEl.setAttribute('opacity', '0.6');
                 svg.appendChild(lineEl);
@@ -2484,7 +2484,6 @@
             const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
             const distance = Math.hypot(dx, dy);
             const elapsed = performance.now() - drag.startedAt;
-            const isFling = distance >= 100 && elapsed <= 650;
             const under = document.elementFromPoint(e.clientX, e.clientY);
             const chip = under?.closest?.('.chip');
             const lineBlock = visual.closest('.line-block');
@@ -2493,7 +2492,6 @@
                 e.clientX < blockRect.left || e.clientX > blockRect.right ||
                 e.clientY < blockRect.top || e.clientY > blockRect.bottom
             ) : false;
-            const isTouch = e.pointerType === 'touch';
             clearTargets();
             drag.ghost.remove();
             noteEl.classList.remove('drag-source');
@@ -2501,10 +2499,9 @@
             if (drag.moved && chip && chip.closest('.line-block')?.dataset.line === String(lineIdx)) {
                 // Dropped on a group's word chip — bind it.
                 attachDetectedNote(lineIdx, noteEl.dataset.noteId, parseInt(chip.dataset.group));
-            } else if (drag.moved && outsideBlock && (isTouch ? isFling : true)) {
-                // Thrown/dragged past the edge of the "words with notes" block:
-                // on touch this requires a deliberate fling, on desktop simply
-                // releasing the mouse outside the block is enough.
+            } else if (drag.moved && outsideBlock) {
+                // Released outside the current line block: remove the detected note
+                // from both the editor and the recorded melody.
                 removeDetectedNote(noteEl.dataset.noteId);
             }
             // Otherwise (dropped inside the block but not on a group chip):
@@ -2817,7 +2814,10 @@
         return Array.isArray(n.groupIdxs) ? n.groupIdxs : (n.groupIdx != null ? [n.groupIdx] : []);
     }
     function lineDuration(lineIdx) {
-        return lineNotes(lineIdx).reduce((s, n) => s + (n.duration || 0.1), 0);
+        // The duration of a player line is the sum of the durations detected
+        // from that line's recording. The original audio blob is not used for
+        // playback: the player reproduces the detected melody note-by-note.
+        return lineNotes(lineIdx).reduce((s, n) => s + (Number(n.duration) > 0 ? Number(n.duration) : 0.1), 0);
     }
     function stopLinePlayback(collapse = true) {
         const pp = state.playerPlayback;
@@ -2852,7 +2852,7 @@
         const activeGroups = new Set();
         let pos = 0;
         for (const n of notes) {
-            const d = n.duration || 0.1;
+            const d = Number(n.duration) > 0 ? Number(n.duration) : 0.1;
             if (clamped >= pos && clamped < pos + d && clamped < total) {
                 noteGroupIdxs(n).forEach(gi => activeGroups.add(gi));
             }
@@ -2865,7 +2865,7 @@
     }
     function formatTime(sec) { sec = Math.max(0, sec || 0); return `${Math.floor(sec/60)}:${String(Math.floor(sec%60)).padStart(2,'0')}`; }
     function playLineFrom(lineIdx, startAt = 0) {
-        const line = state.lines[lineIdx]; if (!line || !line.audioData) return;
+        const line = state.lines[lineIdx]; if (!line) return;
         const notes = lineNotes(lineIdx);
         if (!notes.length) return;
         stopLinePlayback(false);
@@ -2879,7 +2879,7 @@
         let pos = 0;
         for (let i = 0; i < notes.length; i++) {
             const n = notes[i];
-            const d = n.duration || 0.1;
+            const d = Number(n.duration) > 0 ? Number(n.duration) : 0.1;
             if (elapsed >= pos + d) { pos += d; continue; }
             const remaining = pos + d - elapsed;
             if (n.note) playNote(n.note, Math.max(0.08, remaining / speed));
@@ -2898,7 +2898,7 @@
         state.playerPlayback.elapsed = before;
         state.playerPlayback.startedAt = performance.now();
         const n = notes[noteIdx];
-        const d = n.duration || 0.1;
+        const d = Number(n.duration) > 0 ? Number(n.duration) : 0.1;
         if (n.note) playNote(n.note, d / (state.playerPlayback.speed || 1));
         state.playerPlayback.timer = setTimeout(() => playNextNote(lineIdx, noteIdx + 1), d * 1000 / (state.playerPlayback.speed || 1));
     }
@@ -2925,7 +2925,7 @@
         if (state.playerPlayback.expanded === lineIdx) { stopLinePlayback(true); renderPlayer(); return; }
         // Only lines with a recorded/analyzed melody can be expanded and
         // played — without a recording there is nothing to play back.
-        if (!line || !line.audioData || !lineNotes(lineIdx).length) return;
+        if (!line || !lineNotes(lineIdx).length) return;
         stopLinePlayback(true);
         state.playerPlayback.speed = 1;
         playLineFrom(lineIdx, 0);
