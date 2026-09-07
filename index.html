@@ -408,6 +408,7 @@
 
         .line-text-input {
             width: 100%;
+            letter-spacing: normal;
             padding: 8px 12px;
             border: 1px solid var(--glass-border);
             border-radius: 12px;
@@ -589,7 +590,8 @@
             min-height: 34px;
             padding: 4px 0 8px;
         }
-        .line-notes-visual.notes-collapsed .line-notes-strip {
+        .line-notes-visual.notes-collapsed .line-notes-strip,
+        .line-notes-visual.notes-collapsed .line-notes-connections {
             display: none;
         }
         .detected-note {
@@ -614,7 +616,8 @@
             z-index: 4;
         }
         .detected-note:active,
-        .detected-note.dragging {
+        .detected-note.dragging,
+        .detected-note.drag-source {
             cursor: grabbing;
             pointer-events: none;
             opacity: .88;
@@ -1067,7 +1070,10 @@
         .player-speed { display:flex; align-items:center; gap:7px; margin-left:auto; font-size:11px; color:var(--text-mid); }
         .player-speed input { width:110px; accent-color:var(--accent); }
         .player-chip.playing-group { background:var(--accent-soft); border-color:var(--accent); box-shadow:0 0 18px rgba(52,229,192,.2); transform:scale(1.02); }
-        .record-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+        .record-actions { display:flex; align-items:center; gap:8px; flex-wrap:nowrap; margin-bottom:10px; overflow-x:auto; scrollbar-width:thin; }
+        .record-actions > * { flex:0 0 auto; }
+        .line-notes-controls { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:thin; }
+        .line-notes-controls > * { flex:0 0 auto; }
         .record-status { font-size:12px; color:var(--text-low); }
         .record-status.recording { color:var(--danger); }
         .record-status.processing { color:var(--warn); }
@@ -1863,7 +1869,9 @@
                     possibleMatch.join(' ') === oldWords.join(' ')) {
                     newGroups.push({
                         words: oldWords,
-                        note: oldGroup.note
+                        note: oldGroup.note,
+                        duration: oldGroup.duration || 0.6,
+                        _detectedNoteId: oldGroup._detectedNoteId || null
                     });
                     wordIdx += oldWordCount;
                 } else {
@@ -1878,7 +1886,9 @@
                         }
                         newGroups.push({
                             words: [w],
-                            note: foundNote
+                            note: foundNote,
+                            duration: oldGroup.duration || 0.6,
+                            _detectedNoteId: oldGroup._detectedNoteId || null
                         });
                     }
                     wordIdx = newLineWords.length;
@@ -1898,7 +1908,9 @@
                     }
                     newGroups.push({
                         words: [w],
-                        note: foundNote
+                        note: foundNote,
+                        duration: 0.6,
+                        _detectedNoteId: null
                     });
                 }
             }
@@ -1908,7 +1920,9 @@
 
         return existingGroups.map(g => ({
             words: [...g.words],
-            note: g.note
+            note: g.note,
+            duration: g.duration || 0.6,
+            _detectedNoteId: g._detectedNoteId || null
         }));
     }
 
@@ -1918,7 +1932,7 @@
         if (!state.lines || state.lines.length === 0) {
             state.lines = newLines.map(line => {
                 if (isLineEmpty(line)) {
-                    return { groups: [], isEmpty: true, collapsed: false, detectedNotes: [] };
+                    return { groups: [], isEmpty: true, collapsed: false, detectedNotes: [], rawText: line };
                 }
                 return {
                     groups: mergePunctuation(wordsFromLine(line)).map(w => ({
@@ -1927,7 +1941,8 @@
                     })),
                     isEmpty: false,
                     collapsed: false,
-                    detectedNotes: []
+                    detectedNotes: [],
+                    rawText: line
                 };
             });
             return;
@@ -1941,14 +1956,14 @@
             const prevCollapsed = existingLine ? !!existingLine.collapsed : false;
 
             if (isLineEmpty(newLine)) {
-                preservedLines.push({ groups: [], isEmpty: true, collapsed: prevCollapsed, detectedNotes: existingLine?.detectedNotes || [] });
+                preservedLines.push({ groups: [], isEmpty: true, collapsed: prevCollapsed, detectedNotes: existingLine?.detectedNotes || [], rawText: newLine });
                 continue;
             }
 
             const existingGroups = (existingLine && !existingLine.isEmpty) ? existingLine.groups : [];
             const newGroups = computeGroupsForLineText(newLine, existingGroups);
 
-            preservedLines.push({ groups: newGroups, isEmpty: false, collapsed: prevCollapsed, detectedNotes: existingLine?.detectedNotes || [] });
+            preservedLines.push({ groups: newGroups, isEmpty: false, collapsed: prevCollapsed, detectedNotes: existingLine?.detectedNotes || [], rawText: newLine, draft: !!existingLine?.draft, audioData: existingLine?.audioData || null, notesCollapsed: !!existingLine?.notesCollapsed });
         }
 
         state.lines = preservedLines;
@@ -1965,9 +1980,11 @@
             state.lines[lineIdx] = {
                 groups: [],
                 isEmpty: line.draft ? false : true,
+                rawText: newLineText,
                 draft: !!line.draft,
                 collapsed: line.collapsed,
                 audioData: line.audioData || null,
+                notesCollapsed: !!line.notesCollapsed,
                 detectedNotes: (line.detectedNotes || []).map(n => ({...n, groupIdx: null}))
             };
         } else {
@@ -1976,9 +1993,11 @@
             state.lines[lineIdx] = {
                 groups: newGroups,
                 isEmpty: false,
+                rawText: newLineText,
                 draft: !!line.draft,
                 collapsed: line.collapsed,
                 audioData: line.audioData || null,
+                notesCollapsed: !!line.notesCollapsed,
                 detectedNotes: (line.detectedNotes || []).map(n => ({...n, groupIdx: null}))
             };
         }
@@ -1999,7 +2018,7 @@
             return;
         }
 
-        const lineText = line.isEmpty ? '' : line.groups.flatMap(g => g.words).join(' ');
+        const lineText = line.isEmpty ? '' : (line.rawText ?? line.groups.flatMap(g => g.words).join(' '));
         const preview = lineBlock.querySelector('.line-preview');
         if (preview) preview.textContent = lineText;
 
@@ -2070,20 +2089,7 @@
     function handleLineTextCommit(lineIdx, newLineText) {
         const line = state.lines[lineIdx];
         if (!line) return;
-
-        const currentLineText = line.isEmpty ? '' : line.groups.flatMap(g => g.words).join(' ');
-        if (newLineText.trim() === currentLineText.trim()) return;
-
-        if (isLineEmpty(newLineText)) {
-            state.lines[lineIdx] = { groups: [], isEmpty: true, collapsed: line.collapsed, detectedNotes: line.detectedNotes || [] };
-        } else {
-            const existingGroups = line.isEmpty ? [] : line.groups;
-            const newGroups = computeGroupsForLineText(newLineText, existingGroups);
-            state.lines[lineIdx] = { groups: newGroups, isEmpty: false, collapsed: line.collapsed, detectedNotes: (line.detectedNotes || []).map(n => ({...n, groupIdx: null})) };
-        }
-
-        updateTextareaFromState();
-        renderAll();
+        handleLineTextLiveEdit(lineIdx, newLineText);
     }
 
     function toggleLineCollapsed(lineIdx) {
@@ -2099,7 +2105,7 @@
     // ============================================================
     function addEmptyLine() {
         // A draft line is a real editable block, not a visual blank separator.
-        state.lines.push({ groups: [], isEmpty: false, draft: true, collapsed: false, audioData: null, detectedNotes: [], notesCollapsed: false });
+        state.lines.push({ groups: [], isEmpty: false, draft: true, rawText: '', collapsed: false, audioData: null, detectedNotes: [], notesCollapsed: false });
         updateTextareaFromState();
         renderAll();
         requestAnimationFrame(() => {
@@ -2329,66 +2335,94 @@
             const a = noteEl.getBoundingClientRect();
             const b = chip.getBoundingClientRect();
             const x1 = a.left + a.width / 2 - box.left;
-            const y1 = a.top + a.height / 2 - box.top;
+            const y1 = a.bottom - box.top;
             const x2 = b.left + b.width / 2 - box.left;
-            const y2 = b.top + b.height / 2 - box.top;
-            const lineEl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            lineEl.setAttribute('x1', x1); lineEl.setAttribute('y1', y1);
-            lineEl.setAttribute('x2', x2); lineEl.setAttribute('y2', y2);
-            lineEl.setAttribute('stroke', 'currentColor');
-            lineEl.setAttribute('stroke-width', '0.5mm');
-            lineEl.setAttribute('stroke-linecap', 'round');
-            lineEl.setAttribute('opacity', '0.6');
-            svg.appendChild(lineEl);
+            const y2 = b.top - box.top;
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const dir = x2 >= x1 ? 1 : -1;
+            const bend = Math.max(18, Math.min(70, Math.abs(x2 - x1) * 0.22));
+            const d = `M ${x1} ${y1} C ${x1 + dir*bend} ${y1 + 10}, ${x2 - dir*bend} ${y2 - 10}, ${x2} ${y2}`;
+            path.setAttribute('d', d);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', 'currentColor');
+            path.setAttribute('stroke-width', '0.125mm');
+            path.setAttribute('stroke-linecap', 'round');
+            path.setAttribute('opacity', '0.6');
+            svg.appendChild(path);
         });
     }
 
     function setupDetectedNoteDrag(lineIdx, noteEl, visual) {
         let drag = null;
+        let lastTapAt = 0;
         const clearTargets = () => visual.querySelectorAll('.note-drop-target').forEach(el => el.classList.remove('note-drop-target'));
+        const removeDetectedNote = (id) => {
+            const line = state.lines[lineIdx];
+            if (!line) return;
+            const n = line.detectedNotes?.find(x => x.id === id);
+            if (!n) return;
+            if (n.groupIdx != null && line.groups[n.groupIdx]?._detectedNoteId === id) {
+                line.groups[n.groupIdx].note = null;
+                line.groups[n.groupIdx].duration = 0.6;
+                delete line.groups[n.groupIdx]._detectedNoteId;
+            }
+            line.detectedNotes = line.detectedNotes.filter(x => x.id !== id);
+            renderAll();
+        };
         const onMove = e => {
             if (!drag) return;
             const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
             if (!drag.moved && Math.hypot(dx, dy) < 5) return;
             drag.moved = true;
-            noteEl.classList.add('dragging');
-            noteEl.style.position = 'fixed';
-            noteEl.style.left = `${e.clientX - drag.offsetX}px`;
-            noteEl.style.top = `${e.clientY - drag.offsetY}px`;
-            noteEl.style.width = `${drag.width}px`;
-            noteEl.style.margin = '0';
+            const ghost = drag.ghost;
+            ghost.style.left = `${e.clientX - drag.offsetX}px`;
+            ghost.style.top = `${e.clientY - drag.offsetY}px`;
             clearTargets();
             const under = document.elementFromPoint(e.clientX, e.clientY);
             const chip = under?.closest?.('.chip');
             if (chip && chip.closest('.line-block')?.dataset.line === String(lineIdx)) chip.classList.add('note-drop-target');
         };
-        const onUp = e => {
+        const finish = e => {
             if (!drag) return;
-            const wasMoved = drag.moved;
-            const x=e.clientX, y=e.clientY;
-            noteEl.releasePointerCapture?.(e.pointerId);
-            noteEl.classList.remove('dragging');
-            noteEl.style.cssText = '';
-            clearTargets();
-            const under = document.elementFromPoint(x, y);
+            const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
+            const distance = Math.hypot(dx, dy);
+            const elapsed = performance.now() - drag.startedAt;
+            const isIntentionalSwipe = distance >= 100 && elapsed <= 650;
+            const under = document.elementFromPoint(e.clientX, e.clientY);
             const chip = under?.closest?.('.chip');
-            if (wasMoved && chip && chip.closest('.line-block')?.dataset.line === String(lineIdx)) {
+            clearTargets();
+            drag.ghost.remove();
+            noteEl.classList.remove('drag-source');
+            noteEl.releasePointerCapture?.(e.pointerId);
+            if (drag.moved && chip && chip.closest('.line-block')?.dataset.line === String(lineIdx)) {
                 attachDetectedNote(lineIdx, noteEl.dataset.noteId, parseInt(chip.dataset.group));
-            } else if (wasMoved) {
-                detachDetectedNote(lineIdx, noteEl.dataset.noteId);
+            } else if (isIntentionalSwipe) {
+                removeDetectedNote(noteEl.dataset.noteId);
             }
             drag = null;
-            renderDetectedNoteConnections(lineIdx, visual);
         };
         noteEl.addEventListener('pointerdown', e => {
             e.preventDefault();
-            const r=noteEl.getBoundingClientRect();
-            drag={startX:e.clientX,startY:e.clientY,offsetX:e.clientX-r.left,offsetY:e.clientY-r.top,width:r.width,moved:false};
+            const now = performance.now();
+            if (now - lastTapAt < 320) {
+                lastTapAt = 0;
+                openDetectedNotePopup(lineIdx, noteEl.dataset.noteId);
+                return;
+            }
+            lastTapAt = now;
+            const r = noteEl.getBoundingClientRect();
+            const ghost = noteEl.cloneNode(true);
+            ghost.classList.add('detected-note-drag-ghost');
+            Object.assign(ghost.style, { position:'fixed', left:`${r.left}px`, top:`${r.top}px`, width:`${r.width}px`, margin:'0', pointerEvents:'none', zIndex:'9999' });
+            document.body.appendChild(ghost);
+            noteEl.classList.add('drag-source');
+            drag = { startX:e.clientX, startY:e.clientY, offsetX:e.clientX-r.left, offsetY:e.clientY-r.top, moved:false, startedAt:performance.now(), ghost };
             noteEl.setPointerCapture?.(e.pointerId);
         });
         noteEl.addEventListener('pointermove', onMove);
-        noteEl.addEventListener('pointerup', onUp);
-        noteEl.addEventListener('pointercancel', onUp);
+        noteEl.addEventListener('pointerup', finish);
+        noteEl.addEventListener('pointercancel', finish);
+        noteEl.addEventListener('dblclick', e => { e.preventDefault(); e.stopPropagation(); openDetectedNotePopup(lineIdx, noteEl.dataset.noteId); });
     }
 
     function mergeGroupWithNext(lineIdx, groupIdx) {
@@ -2458,6 +2492,7 @@
                     note: null
                 })),
                 isEmpty: false,
+                rawText: line,
                 collapsed: false,
                 detectedNotes: []
             };
@@ -2466,11 +2501,7 @@
     }
 
     function updateTextareaFromState() {
-        const lines = state.lines.map(line => {
-            if (line.isEmpty) return '';
-            return line.groups.flatMap(g => g.words).join(' ');
-        });
-        lyricsInput.value = lines.join('\n');
+        lyricsInput.value = state.lines.map(line => line.rawText ?? (line.isEmpty ? '' : line.groups.flatMap(g => g.words).join(' '))).join('\n');
     }
 
     // ============================================================
@@ -2490,6 +2521,7 @@
 
         let totalGroups = 0;
         let html = '';
+        let displayLineNumber = 0;
         for (let li = 0; li < state.lines.length; li++) {
             const line = state.lines[li];
 
@@ -2499,7 +2531,8 @@
             }
 
             totalGroups += line.groups.length;
-            const lineText = line.groups.flatMap(g => g.words).join(' ');
+            const lineText = line.rawText ?? line.groups.flatMap(g => g.words).join(' ');
+            if (lineText.trim()) displayLineNumber++;
             const collapsedClass = line.collapsed ? ' collapsed' : '';
 
             const draftClass = line.draft ? ' draft' : '';
@@ -2507,7 +2540,7 @@
 
             html += `<div class="line-block-header" data-line="${li}">`;
             html += `<button class="collapse-toggle" type="button" tabindex="-1" title="Згорнути/розгорнути рядок">▾</button>`;
-            html += `<span class="line-number">${li + 1}</span>`;
+            html += `<span class="line-number">${displayLineNumber}</span>`;
             html += `<span class="line-preview">${escapeHtml(lineText)}</span>`;
             html += `</div>`;
 
@@ -2575,7 +2608,7 @@
         container.querySelectorAll('.line-text-input').forEach(input => {
             const li = parseInt(input.dataset.line);
             const line = state.lines[li];
-            input.value = (line && !line.isEmpty) ? line.groups.flatMap(g => g.words).join(' ') : '';
+            input.value = (line && !line.isEmpty) ? (line.rawText ?? line.groups.flatMap(g => g.words).join(' ')) : '';
 
             // Update groups immediately while typing. Only the groups/preview
             // DOM is refreshed, so this input keeps focus and its caret position.
@@ -2745,7 +2778,17 @@
         if (!pp.playing || pp.lineIdx === null) return;
         const elapsed = pp.elapsed + (performance.now() - pp.startedAt) / 1000 * (pp.speed || 1);
         setPlayerProgress(pp.lineIdx, elapsed);
-        if (elapsed >= lineDuration(pp.lineIdx)) { pp.playing = false; setPlayerProgress(pp.lineIdx, lineDuration(pp.lineIdx)); renderPlayer(); return; }
+        if (elapsed >= lineDuration(pp.lineIdx)) {
+            const finishedLine = pp.lineIdx;
+            if (pp.timer) clearTimeout(pp.timer);
+            pp.timer = null;
+            pp.playing = false;
+            pp.elapsed = lineDuration(finishedLine);
+            pp.lineIdx = finishedLine;
+            setPlayerProgress(finishedLine, pp.elapsed);
+            renderPlayer();
+            return;
+        }
         pp.raf = requestAnimationFrame(playerAnimationFrame);
     }
     function togglePlayerLine(lineIdx) {
@@ -2779,6 +2822,7 @@
         }
         let totalGroups = 0;
         let html = '';
+        let displayLineNumber = 0;
         for (let li = 0; li < state.lines.length; li++) {
             const line = state.lines[li];
             if (line.isEmpty) { html += `<div class="player-line empty-line"></div>`; continue; }
@@ -2788,7 +2832,7 @@
             html += `<div class="player-line${state.playerPlayback.lineIdx===li && state.playerPlayback.playing?' playing-line':''}" data-line="${li}">`;
             html += `<div class="player-line-head">`;
             html += `<button class="player-line-play${expanded?' expanded':''}" data-line-play="${li}" title="Програти рядок">▶</button>`;
-            html += `<span class="player-line-label">${li + 1}</span>`;
+            html += `<span class="player-line-label">${state.lines.slice(0, li + 1).filter(l => !l.isEmpty && ((l.rawText ?? '').trim().length || l.groups.length)).length}</span>`;
             html += `<div class="player-chips">`;
             for (let gi = 0; gi < line.groups.length; gi++) {
                 const group = line.groups[gi];
@@ -2820,7 +2864,10 @@
         }
         container.innerHTML = html;
         playerGroupCount.textContent = `${totalGroups} груп`;
-        container.querySelectorAll('.player-line-play').forEach(btn => btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); togglePlayerLine(parseInt(btn.dataset.line)); }));
+        container.querySelectorAll('.player-line-play').forEach(btn => {
+            btn.type='button';
+            btn.addEventListener('pointerup', e => { e.preventDefault(); e.stopPropagation(); const li=parseInt(btn.dataset.line); if(Number.isInteger(li)) togglePlayerLine(li); });
+        });
         container.querySelectorAll('[data-prev-line]').forEach(btn => btn.addEventListener('click', ()=>switchPlayerLine(-1)));
         container.querySelectorAll('[data-next-line]').forEach(btn => btn.addEventListener('click', ()=>switchPlayerLine(1)));
         container.querySelectorAll('[data-restart-line]').forEach(btn => btn.addEventListener('click', ()=>playLineFrom(parseInt(btn.dataset.restartLine),0)));
@@ -2856,6 +2903,30 @@
     // ============================================================
     let popupLineIdx = null;
     let popupGroupIdx = null;
+    let popupDetectedNoteId = null;
+
+    function openDetectedNotePopup(lineIdx, noteId) {
+        const line = state.lines[lineIdx];
+        const detected = line?.detectedNotes?.find(n => n.id === noteId);
+        if (!detected) return;
+        popupLineIdx = lineIdx;
+        popupGroupIdx = null;
+        popupDetectedNoteId = noteId;
+        state.tempNote = detected.note;
+        noteGrid.innerHTML = '';
+        const octaveGroups = [
+            { label: 'Мала октава', notes: state.notes.filter(n => n.endsWith('3')) },
+            { label: 'Перша октава', notes: state.notes.filter(n => n.endsWith('4')) },
+            { label: 'Друга октава', notes: state.notes.filter(n => n.endsWith('5')) }
+        ];
+        octaveGroups.forEach(group => {
+            const labelEl=document.createElement('div'); labelEl.className='octave-label'; labelEl.textContent=group.label; noteGrid.appendChild(labelEl);
+            const rowEl=document.createElement('div'); rowEl.className='octave-row';
+            group.notes.forEach(n => { const btn=document.createElement('button'); btn.className='note-btn'; if(n===detected.note)btn.classList.add('selected'); btn.textContent=n.replace(/\d/,''); btn.title=n; btn.addEventListener('click',()=>{ state.tempNote=n; saveNoteAndClose(); }); rowEl.appendChild(btn); });
+            noteGrid.appendChild(rowEl);
+        });
+        notePopup.classList.add('open');
+    }
 
     function openNotePopup(lineIdx, groupIdx) {
         const group = getGroup(lineIdx, groupIdx);
@@ -2906,19 +2977,23 @@
 
     function closeNotePopup() {
         notePopup.classList.remove('open');
-        popupLineIdx = null;
-        popupGroupIdx = null;
-        state.tempNote = null;
+        popupLineIdx = null; popupGroupIdx = null; popupDetectedNoteId = null; state.tempNote = null;
     }
 
     function saveNoteAndClose() {
+        if (popupDetectedNoteId !== null && popupLineIdx !== null) {
+            const line=state.lines[popupLineIdx]; const detected=line?.detectedNotes?.find(n=>n.id===popupDetectedNoteId);
+            if (detected && state.tempNote) { detected.note=state.tempNote; if(detected.groupIdx!=null && line.groups[detected.groupIdx]) { line.groups[detected.groupIdx].note=state.tempNote; line.groups[detected.groupIdx].duration=detected.duration; } playNoteOnce(state.tempNote); renderAll(); }
+            closeNotePopup(); return;
+        }
         if (popupLineIdx === null || popupGroupIdx === null) return;
-        const note = state.tempNote;
-        setGroupNote(popupLineIdx, popupGroupIdx, note);
-        closeNotePopup();
+        setGroupNote(popupLineIdx, popupGroupIdx, state.tempNote); closeNotePopup();
     }
 
     function removeNoteAndClose() {
+        if (popupDetectedNoteId !== null && popupLineIdx !== null) {
+            const line=state.lines[popupLineIdx]; if(line) { line.detectedNotes=(line.detectedNotes||[]).filter(n=>n.id!==popupDetectedNoteId); line.groups.forEach(g=>{ if(g._detectedNoteId===popupDetectedNoteId){g.note=null;g.duration=0.6;delete g._detectedNoteId;} }); renderAll(); } closeNotePopup(); return;
+        }
         if (popupLineIdx === null || popupGroupIdx === null) return;
         state.tempNote = null;
         setGroupNote(popupLineIdx, popupGroupIdx, null);
@@ -2978,6 +3053,7 @@
             return {
                 groups,
                 isEmpty: false,
+                rawText: groups.flatMap(g=>g.words).join(' '),
                 collapsed: false,
                 detectedNotes
             };
