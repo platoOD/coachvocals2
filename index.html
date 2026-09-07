@@ -388,7 +388,7 @@
             flex: 1;
             min-width: 0;
             overflow: hidden;
-            white-space: nowrap;
+            white-space: pre;
             text-overflow: ellipsis;
             color: var(--text-mid);
             font-size: 14px;
@@ -565,6 +565,16 @@
             gap: 8px;
             margin: 2px 0 8px;
         }
+        .record-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            scrollbar-width: thin;
+            margin-bottom: 8px;
+        }
+        .record-actions > * { flex: 0 0 auto; }
         .line-notes-toggle,
         .clear-line-notes-btn {
             border: 1px solid var(--glass-border);
@@ -1060,6 +1070,7 @@
         .player-line-head { display:flex; align-items:center; gap:8px; }
         .player-line-play { width:32px; height:32px; border-radius:50%; border:1px solid var(--glass-border); background:var(--glass); color:var(--text-hi); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:transform .2s, background .2s, border-color .2s; flex-shrink:0; }
         .player-line-play.expanded { transform:rotate(90deg); background:var(--accent-soft); border-color:var(--accent); color:var(--accent); }
+        .player-line-play.disabled { opacity:.35; cursor:not-allowed; }
         .player-line-player { margin-top:10px; padding:10px; border:1px solid var(--glass-border); border-radius:14px; background:rgba(255,255,255,.025); }
         .player-track { position:relative; width:100%; height:8px; border-radius:8px; background:rgba(255,255,255,.1); cursor:pointer; touch-action:none; }
         .player-track-progress { position:absolute; left:0; top:0; bottom:0; width:0; border-radius:8px; background:var(--accent); pointer-events:none; }
@@ -1070,7 +1081,7 @@
         .player-speed { display:flex; align-items:center; gap:7px; margin-left:auto; font-size:11px; color:var(--text-mid); }
         .player-speed input { width:110px; accent-color:var(--accent); }
         .player-chip.playing-group { background:var(--accent-soft); border-color:var(--accent); box-shadow:0 0 18px rgba(52,229,192,.2); transform:scale(1.02); }
-        .record-actions { display:flex; align-items:center; gap:8px; flex-wrap:nowrap; margin-bottom:10px; overflow-x:auto; scrollbar-width:thin; }
+        .record-actions { display:flex; align-items:center; gap:8px; flex-wrap:nowrap; margin-bottom:8px; overflow-x:auto; scrollbar-width:thin; }
         .record-actions > * { flex:0 0 auto; }
         .line-notes-controls { flex-wrap:nowrap; overflow-x:auto; scrollbar-width:thin; }
         .line-notes-controls > * { flex:0 0 auto; }
@@ -1741,6 +1752,13 @@
     // A line that contains no Cyrillic characters (for example "E   H   F#"
     // or "Chorus:") becomes an empty line. Original empty lines are kept.
     function cleanLyricsLine(line) {
+        // Remember whether this line actually contained Latin letters (chord
+        // names like "Am", "G#m", etc.). Whitespace normalization below is
+        // only needed to clean up the gaps chords leave behind — it must NOT
+        // run on plain manual typing, or every space/indent the user types
+        // (including trailing/leading ones) gets stripped on every keystroke.
+        const hadLatin = /[A-Za-z]/.test(line);
+
         // First remove Latin letters. This also removes chord names embedded
         // among spaces, leaving their #/b/m/etc. behind temporarily.
         let cleaned = line.replace(/[A-Za-z]/g, '');
@@ -1757,8 +1775,14 @@
             return '';
         }
 
-        // Normalize excessive whitespace introduced by chord columns.
-        return cleaned.replace(/[ \t]+/g, ' ').trim();
+        if (hadLatin) {
+            // Normalize excessive whitespace introduced by chord columns.
+            return cleaned.replace(/[ \t]+/g, ' ').trim();
+        }
+
+        // Plain manual typing: keep the user's spacing exactly as typed,
+        // including leading/trailing spaces and indents between words.
+        return cleaned;
     }
 
     function cleanLyricsText(text) {
@@ -1871,7 +1895,7 @@
                         words: oldWords,
                         note: oldGroup.note,
                         duration: oldGroup.duration || 0.6,
-                        _detectedNoteId: oldGroup._detectedNoteId || null
+                        _detectedNoteIds: Array.isArray(oldGroup._detectedNoteIds) ? [...oldGroup._detectedNoteIds] : (oldGroup._detectedNoteId ? [oldGroup._detectedNoteId] : [])
                     });
                     wordIdx += oldWordCount;
                 } else {
@@ -1888,7 +1912,7 @@
                             words: [w],
                             note: foundNote,
                             duration: oldGroup.duration || 0.6,
-                            _detectedNoteId: oldGroup._detectedNoteId || null
+                            _detectedNoteIds: Array.isArray(oldGroup._detectedNoteIds) ? [...oldGroup._detectedNoteIds] : (oldGroup._detectedNoteId ? [oldGroup._detectedNoteId] : [])
                         });
                     }
                     wordIdx = newLineWords.length;
@@ -1910,7 +1934,7 @@
                         words: [w],
                         note: foundNote,
                         duration: 0.6,
-                        _detectedNoteId: null
+                        _detectedNoteIds: []
                     });
                 }
             }
@@ -1922,7 +1946,7 @@
             words: [...g.words],
             note: g.note,
             duration: g.duration || 0.6,
-            _detectedNoteId: g._detectedNoteId || null
+            _detectedNoteIds: Array.isArray(g._detectedNoteIds) ? [...g._detectedNoteIds] : (g._detectedNoteId ? [g._detectedNoteId] : [])
         }));
     }
 
@@ -1972,6 +1996,23 @@
     // Updates one line's state and its visible groups immediately while the
     // user is typing. The line input itself is NOT re-rendered, so focus and
     // cursor position are preserved.
+    function syncDetectedNoteLinks(line) {
+        if (!line) return;
+        const notes = line.detectedNotes || [];
+        notes.forEach(n => {
+            n.groupIdxs = [];
+            delete n.groupIdx;
+        });
+        line.groups.forEach((g, gi) => {
+            const ids = groupDetectedIds(g);
+            if (!ids.length) return;
+            g._detectedNoteIds = [ids[0]];
+            delete g._detectedNoteId;
+            const n = notes.find(x => x.id === ids[0]);
+            if (n) n.groupIdxs.push(gi);
+        });
+    }
+
     function handleLineTextLiveEdit(lineIdx, newLineText) {
         const line = state.lines[lineIdx];
         if (!line) return;
@@ -1985,7 +2026,7 @@
                 collapsed: line.collapsed,
                 audioData: line.audioData || null,
                 notesCollapsed: !!line.notesCollapsed,
-                detectedNotes: (line.detectedNotes || []).map(n => ({...n, groupIdx: null}))
+                detectedNotes: (line.detectedNotes || []).map(n => ({...n, groupIdxs: Array.isArray(n.groupIdxs) ? [...n.groupIdxs] : (n.groupIdx != null ? [n.groupIdx] : [])}))
             };
         } else {
             const existingGroups = line.isEmpty ? [] : line.groups;
@@ -1998,10 +2039,11 @@
                 collapsed: line.collapsed,
                 audioData: line.audioData || null,
                 notesCollapsed: !!line.notesCollapsed,
-                detectedNotes: (line.detectedNotes || []).map(n => ({...n, groupIdx: null}))
+                detectedNotes: (line.detectedNotes || []).map(n => ({...n, groupIdxs: Array.isArray(n.groupIdxs) ? [...n.groupIdxs] : (n.groupIdx != null ? [n.groupIdx] : [])}))
             };
         }
 
+        syncDetectedNoteLinks(state.lines[lineIdx]);
         updateTextareaFromState();
         updateLineGroupsDOM(lineIdx);
     }
@@ -2188,7 +2230,7 @@
                 id: `n-${Date.now()}-${i}`,
                 note: n.note,
                 duration: n.duration,
-                groupIdx: null
+                groupIdxs: []
             }));
             // Do not generate or modify lyric text here. The existing text remains intact.
             renderAll();
@@ -2248,17 +2290,18 @@
 
     function setGroupNote(lineIdx, groupIdx, note) {
         const g = getGroup(lineIdx, groupIdx);
-        if (g) {
-            if (g._detectedNoteId) {
-                const line = state.lines[lineIdx];
-                const detected = line?.detectedNotes?.find(n => n.id === g._detectedNoteId);
-                if (detected) detected.groupIdx = null;
-                delete g._detectedNoteId;
-            }
-            g.note = note;
-            if (note && !g.duration) g.duration = 0.6;
-            if (note) playNoteOnce(note);
-        }
+        if (!g) return;
+        const line = state.lines[lineIdx];
+        const ids = Array.isArray(g._detectedNoteIds) ? [...g._detectedNoteIds] : (g._detectedNoteId ? [g._detectedNoteId] : []);
+        ids.forEach(id => {
+            const detected = line.detectedNotes?.find(n => n.id === id);
+            if (detected) detected.groupIdxs = (detected.groupIdxs || []).filter(i => i !== groupIdx);
+        });
+        delete g._detectedNoteIds;
+        delete g._detectedNoteId;
+        g.note = note;
+        if (note && !g.duration) g.duration = 0.6;
+        if (note) playNoteOnce(note);
         renderAll();
     }
 
@@ -2266,89 +2309,110 @@
         const line = state.lines[lineIdx];
         if (!line) return;
         line.detectedNotes = [];
-        line.groups.forEach(g => { g.note = null; g.duration = 0.6; });
+        line.groups.forEach(g => { g.note = null; g.duration = 0.6; delete g._detectedNoteIds; delete g._detectedNoteId; });
         renderAll();
+    }
+
+    function normalizeDetectedNoteLinks(line, note) {
+        if (!Array.isArray(note.groupIdxs)) {
+            note.groupIdxs = note.groupIdx != null ? [note.groupIdx] : [];
+            delete note.groupIdx;
+        }
+        return note.groupIdxs;
+    }
+
+    function groupDetectedIds(group) {
+        if (!group) return [];
+        if (Array.isArray(group._detectedNoteIds)) return group._detectedNoteIds;
+        return group._detectedNoteId ? [group._detectedNoteId] : [];
     }
 
     function attachDetectedNote(lineIdx, noteId, groupIdx) {
         const line = state.lines[lineIdx];
         if (!line) return;
         const detected = (line.detectedNotes || []).find(n => n.id === noteId);
-        if (!detected || !line.groups[groupIdx]) return;
-
-        // Remove this detected note from its previous group.
-        const oldIdx = detected.groupIdx;
-        if (oldIdx !== null && oldIdx !== undefined && line.groups[oldIdx]) {
-            const oldGroup = line.groups[oldIdx];
-            if (oldGroup._detectedNoteId === noteId) {
-                oldGroup.note = null;
-                oldGroup.duration = 0.6;
-                delete oldGroup._detectedNoteId;
-            }
-        }
-
-        // A group has one active playback note; replace an existing attachment.
         const target = line.groups[groupIdx];
-        if (target._detectedNoteId && target._detectedNoteId !== noteId) {
-            const previous = line.detectedNotes.find(n => n.id === target._detectedNoteId);
-            if (previous) previous.groupIdx = null;
-        }
+        if (!detected || !target) return;
+        const links = normalizeDetectedNoteLinks(line, detected);
+
+        // The same detected note may be assigned to many groups. If this group
+        // already uses another detected note, that note is replaced only here.
+        const existingIds = groupDetectedIds(target);
+        existingIds.forEach(oldId => {
+            if (oldId === noteId) return;
+            const previous = line.detectedNotes.find(n => n.id === oldId);
+            if (previous) {
+                normalizeDetectedNoteLinks(line, previous);
+                previous.groupIdxs = previous.groupIdxs.filter(i => i !== groupIdx);
+            }
+        });
+
+        target._detectedNoteIds = [noteId];
+        delete target._detectedNoteId;
         target.note = detected.note;
         target.duration = detected.duration;
-        target._detectedNoteId = noteId;
-        detected.groupIdx = groupIdx;
+        if (!links.includes(groupIdx)) links.push(groupIdx);
+        detected.groupIdxs = links;
         playNoteOnce(detected.note);
         renderAll();
     }
 
-    function detachDetectedNote(lineIdx, noteId) {
+    function detachDetectedNote(lineIdx, noteId, groupIdx = null) {
         const line = state.lines[lineIdx];
         if (!line) return;
         const detected = (line.detectedNotes || []).find(n => n.id === noteId);
         if (!detected) return;
-        const gi = detected.groupIdx;
-        if (gi !== null && gi !== undefined && line.groups[gi]) {
-            const g = line.groups[gi];
-            if (g._detectedNoteId === noteId) {
-                g.note = null;
-                g.duration = 0.6;
-                delete g._detectedNoteId;
+        const links = normalizeDetectedNoteLinks(line, detected);
+        const toRemove = groupIdx == null ? [...links] : [groupIdx];
+        toRemove.forEach(gi => {
+            if (line.groups[gi]) {
+                const g = line.groups[gi];
+                const ids = groupDetectedIds(g).filter(id => id !== noteId);
+                if (ids.length) g._detectedNoteIds = ids;
+                else {
+                    delete g._detectedNoteIds;
+                    delete g._detectedNoteId;
+                    g.note = null;
+                    g.duration = 0.6;
+                }
             }
-        }
-        detected.groupIdx = null;
+        });
+        detected.groupIdxs = links.filter(i => !toRemove.includes(i));
         renderAll();
     }
 
     function renderDetectedNoteConnections(lineIdx, visual) {
         const line = state.lines[lineIdx];
-        if (!line) return;
+        if (!line || line.notesCollapsed) return;
         const svg = visual.querySelector('.line-notes-connections');
         if (!svg) return;
         const box = visual.getBoundingClientRect();
         svg.setAttribute('viewBox', `0 0 ${Math.max(1, box.width)} ${Math.max(1, box.height)}`);
         svg.innerHTML = '';
         (line.detectedNotes || []).forEach(n => {
-            if (n.groupIdx === null || n.groupIdx === undefined) return;
             const noteEl = visual.querySelector(`.detected-note[data-note-id="${CSS.escape(n.id)}"]`);
-            const chip = visual.querySelector(`.chip[data-group="${n.groupIdx}"]`);
-            if (!noteEl || !chip) return;
-            const a = noteEl.getBoundingClientRect();
-            const b = chip.getBoundingClientRect();
-            const x1 = a.left + a.width / 2 - box.left;
-            const y1 = a.bottom - box.top;
-            const x2 = b.left + b.width / 2 - box.left;
-            const y2 = b.top - box.top;
-            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            const dir = x2 >= x1 ? 1 : -1;
-            const bend = Math.max(18, Math.min(70, Math.abs(x2 - x1) * 0.22));
-            const d = `M ${x1} ${y1} C ${x1 + dir*bend} ${y1 + 10}, ${x2 - dir*bend} ${y2 - 10}, ${x2} ${y2}`;
-            path.setAttribute('d', d);
-            path.setAttribute('fill', 'none');
-            path.setAttribute('stroke', 'currentColor');
-            path.setAttribute('stroke-width', '0.125mm');
-            path.setAttribute('stroke-linecap', 'round');
-            path.setAttribute('opacity', '0.6');
-            svg.appendChild(path);
+            if (!noteEl) return;
+            const links = Array.isArray(n.groupIdxs) ? n.groupIdxs : (n.groupIdx != null ? [n.groupIdx] : []);
+            links.forEach(groupIdx => {
+                const chip = visual.querySelector(`.chip[data-group="${groupIdx}"]`);
+                if (!chip) return;
+                const a = noteEl.getBoundingClientRect();
+                const b = chip.getBoundingClientRect();
+                const x1 = a.left + a.width / 2 - box.left;
+                const y1 = a.bottom - box.top;
+                const x2 = b.left + b.width / 2 - box.left;
+                const y2 = b.top - box.top;
+                const lineEl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                lineEl.setAttribute('x1', x1);
+                lineEl.setAttribute('y1', y1);
+                lineEl.setAttribute('x2', x2);
+                lineEl.setAttribute('y2', y2);
+                lineEl.setAttribute('stroke', 'currentColor');
+                lineEl.setAttribute('stroke-width', '0.03125mm');
+                lineEl.setAttribute('stroke-linecap', 'round');
+                lineEl.setAttribute('opacity', '0.6');
+                svg.appendChild(lineEl);
+            });
         });
     }
 
@@ -2361,11 +2425,14 @@
             if (!line) return;
             const n = line.detectedNotes?.find(x => x.id === id);
             if (!n) return;
-            if (n.groupIdx != null && line.groups[n.groupIdx]?._detectedNoteId === id) {
-                line.groups[n.groupIdx].note = null;
-                line.groups[n.groupIdx].duration = 0.6;
-                delete line.groups[n.groupIdx]._detectedNoteId;
-            }
+            line.groups.forEach(g => {
+                const ids = groupDetectedIds(g).filter(x => x !== id);
+                if (ids.length) g._detectedNoteIds = ids;
+                else if (groupDetectedIds(g).length) {
+                    delete g._detectedNoteIds; delete g._detectedNoteId;
+                    g.note = null; g.duration = 0.6;
+                }
+            });
             line.detectedNotes = line.detectedNotes.filter(x => x.id !== id);
             renderAll();
         };
@@ -2444,8 +2511,8 @@
             duration: (current.duration || 0.6) + (next.duration || 0.6)
         });
 
-        (line.detectedNotes || []).forEach(n => n.groupIdx = null);
-        line.groups.forEach(g => delete g._detectedNoteId);
+        (line.detectedNotes || []).forEach(n => { n.groupIdxs = []; delete n.groupIdx; });
+        line.groups.forEach(g => { delete g._detectedNoteIds; delete g._detectedNoteId; });
         updateTextareaFromState();
         renderAll();
     }
@@ -2472,8 +2539,8 @@
             duration: 0.6
         });
 
-        (line.detectedNotes || []).forEach(n => n.groupIdx = null);
-        line.groups.forEach(g => delete g._detectedNoteId);
+        (line.detectedNotes || []).forEach(n => { n.groupIdxs = []; delete n.groupIdx; });
+        line.groups.forEach(g => { delete g._detectedNoteIds; delete g._detectedNoteId; });
         updateTextareaFromState();
         renderAll();
     }
@@ -2546,19 +2613,17 @@
 
             html += `<div class="line-block-body">`;
             html += `<input type="text" class="line-text-input" data-line="${li}" placeholder="Текст рядка">`;
+            const notes = line.detectedNotes || [];
             html += `<div class="record-actions">`;
             html += `<button class="btn btn-secondary btn-sm record-line-btn" data-line="${li}" type="button">🎙 Додати аудіо</button>`;
             html += `<button class="clear-line-notes-btn" data-clear-line-notes="${li}" type="button">🗑 Видалити всі ноти</button>`;
+            html += `<button class="line-notes-toggle" data-toggle-notes="${li}" type="button">♫ Ноти${notes.length ? ` (${notes.length})` : ''} ${line.notesCollapsed ? '▸' : '▾'}</button>`;
             if (line.audioData) html += `<span class="line-audio-badge">● Аудіо проаналізовано</span>`;
             html += `<span class="record-status" data-record-status="${li}"></span>`;
             html += `</div>`;
-            const notes = line.detectedNotes || [];
             const notesCollapsed = line.notesCollapsed ? ' notes-collapsed' : '';
             html += `<div class="line-notes-visual${notesCollapsed}" data-notes-visual="${li}">`;
             html += `<svg class="line-notes-connections" aria-hidden="true"></svg>`;
-            html += `<div class="line-notes-controls">`;
-            html += `<button class="line-notes-toggle" data-toggle-notes="${li}" type="button">♫ Ноти${notes.length ? ` (${notes.length})` : ''} ${line.notesCollapsed ? '▸' : '▾'}</button>`;
-            html += `</div>`;
             html += `<div class="line-notes-strip">`;
             if (notes.length) {
                 notes.forEach(n => {
@@ -2739,7 +2804,7 @@
     }
     function formatTime(sec) { sec = Math.max(0, sec || 0); return `${Math.floor(sec/60)}:${String(Math.floor(sec%60)).padStart(2,'0')}`; }
     function playLineFrom(lineIdx, startAt = 0) {
-        const line = state.lines[lineIdx]; if (!line || !line.groups.length) return;
+        const line = state.lines[lineIdx]; if (!line || !line.groups.length || !line.audioData) return;
         stopLinePlayback(false);
         state.playerPlayback.lineIdx = lineIdx;
         state.playerPlayback.expanded = lineIdx;
@@ -2792,7 +2857,11 @@
         pp.raf = requestAnimationFrame(playerAnimationFrame);
     }
     function togglePlayerLine(lineIdx) {
+        const line = state.lines[lineIdx];
         if (state.playerPlayback.expanded === lineIdx) { stopLinePlayback(true); renderPlayer(); return; }
+        // Only lines with a recorded/analyzed audio take can be expanded and
+        // played — without a recording there is nothing to play back.
+        if (!line || !line.audioData) return;
         stopLinePlayback(true);
         state.playerPlayback.speed = 1;
         playLineFrom(lineIdx, 0);
@@ -2804,7 +2873,7 @@
     }
     function switchPlayerLine(delta) {
         const current = state.playerPlayback.expanded ?? 0;
-        const candidates = state.lines.map((l,i)=>({l,i})).filter(x=>!x.l.isEmpty && x.l.groups.length);
+        const candidates = state.lines.map((l,i)=>({l,i})).filter(x=>!x.l.isEmpty && x.l.groups.length && x.l.audioData);
         const idx = candidates.findIndex(x=>x.i === current);
         const next = candidates[Math.max(0, Math.min(candidates.length-1, idx + delta))];
         if (!next) return;
@@ -2831,7 +2900,8 @@
             const expanded = state.playerPlayback.expanded === li;
             html += `<div class="player-line${state.playerPlayback.lineIdx===li && state.playerPlayback.playing?' playing-line':''}" data-line="${li}">`;
             html += `<div class="player-line-head">`;
-            html += `<button class="player-line-play${expanded?' expanded':''}" data-line-play="${li}" title="Програти рядок">▶</button>`;
+            const hasAudio = !!line.audioData;
+            html += `<button class="player-line-play${expanded?' expanded':''}${hasAudio?'':' disabled'}" data-line-play="${li}" title="${hasAudio?'Програти рядок':'Немає запису для цього рядка'}">▶</button>`;
             html += `<span class="player-line-label">${state.lines.slice(0, li + 1).filter(l => !l.isEmpty && ((l.rawText ?? '').trim().length || l.groups.length)).length}</span>`;
             html += `<div class="player-chips">`;
             for (let gi = 0; gi < line.groups.length; gi++) {
@@ -2866,7 +2936,7 @@
         playerGroupCount.textContent = `${totalGroups} груп`;
         container.querySelectorAll('.player-line-play').forEach(btn => {
             btn.type='button';
-            btn.addEventListener('pointerup', e => { e.preventDefault(); e.stopPropagation(); const li=parseInt(btn.dataset.line); if(Number.isInteger(li)) togglePlayerLine(li); });
+            btn.addEventListener('pointerup', e => { e.preventDefault(); e.stopPropagation(); if (btn.classList.contains('disabled')) return; const li=parseInt(btn.dataset.linePlay); if(Number.isInteger(li)) togglePlayerLine(li); });
         });
         container.querySelectorAll('[data-prev-line]').forEach(btn => btn.addEventListener('click', ()=>switchPlayerLine(-1)));
         container.querySelectorAll('[data-next-line]').forEach(btn => btn.addEventListener('click', ()=>switchPlayerLine(1)));
@@ -2983,7 +3053,18 @@
     function saveNoteAndClose() {
         if (popupDetectedNoteId !== null && popupLineIdx !== null) {
             const line=state.lines[popupLineIdx]; const detected=line?.detectedNotes?.find(n=>n.id===popupDetectedNoteId);
-            if (detected && state.tempNote) { detected.note=state.tempNote; if(detected.groupIdx!=null && line.groups[detected.groupIdx]) { line.groups[detected.groupIdx].note=state.tempNote; line.groups[detected.groupIdx].duration=detected.duration; } playNoteOnce(state.tempNote); renderAll(); }
+            if (detected && state.tempNote) {
+                detected.note = state.tempNote;
+                const links = Array.isArray(detected.groupIdxs) ? detected.groupIdxs : (detected.groupIdx != null ? [detected.groupIdx] : []);
+                links.forEach(gi => {
+                    if (line.groups[gi]) {
+                        line.groups[gi].note = state.tempNote;
+                        line.groups[gi].duration = detected.duration;
+                    }
+                });
+                playNoteOnce(state.tempNote);
+                renderAll();
+            }
             closeNotePopup(); return;
         }
         if (popupLineIdx === null || popupGroupIdx === null) return;
@@ -2992,7 +3073,7 @@
 
     function removeNoteAndClose() {
         if (popupDetectedNoteId !== null && popupLineIdx !== null) {
-            const line=state.lines[popupLineIdx]; if(line) { line.detectedNotes=(line.detectedNotes||[]).filter(n=>n.id!==popupDetectedNoteId); line.groups.forEach(g=>{ if(g._detectedNoteId===popupDetectedNoteId){g.note=null;g.duration=0.6;delete g._detectedNoteId;} }); renderAll(); } closeNotePopup(); return;
+            const line=state.lines[popupLineIdx]; if(line) { line.detectedNotes=(line.detectedNotes||[]).filter(n=>n.id!==popupDetectedNoteId); line.groups.forEach(g=>{ const ids=groupDetectedIds(g).filter(id=>id!==popupDetectedNoteId); if(ids.length) g._detectedNoteIds=ids; else if(groupDetectedIds(g).length){delete g._detectedNoteIds; delete g._detectedNoteId; g.note=null; g.duration=0.6;} }); renderAll(); } closeNotePopup(); return;
         }
         if (popupLineIdx === null || popupGroupIdx === null) return;
         state.tempNote = null;
@@ -3019,7 +3100,7 @@
                         id: n.id,
                         note: n.note,
                         d: n.duration,
-                        gi: n.groupIdx ?? null
+                        gi: Array.isArray(n.groupIdxs) ? n.groupIdxs : (n.groupIdx != null ? [n.groupIdx] : [])
                     }))
                 };
             })
@@ -3044,11 +3125,16 @@
                 id: n.id || `n-share-${Date.now()}-${i}`,
                 note: n.note,
                 duration: n.d || 0.6,
-                groupIdx: Number.isInteger(n.gi) ? n.gi : null
+                groupIdxs: Array.isArray(n.gi) ? n.gi.filter(Number.isInteger) : (Number.isInteger(n.gi) ? [n.gi] : [])
             }));
-            groups.forEach(g => delete g._detectedNoteId);
+            groups.forEach(g => { delete g._detectedNoteIds; delete g._detectedNoteId; });
             detectedNotes.forEach(n => {
-                if (n.groupIdx !== null && groups[n.groupIdx]) groups[n.groupIdx]._detectedNoteId = n.id;
+                n.groupIdxs.forEach(gi => {
+                    if (!groups[gi]) return;
+                    groups[gi]._detectedNoteIds = [n.id];
+                    groups[gi].note = n.note;
+                    groups[gi].duration = n.duration;
+                });
             });
             return {
                 groups,
