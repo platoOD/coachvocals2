@@ -1386,7 +1386,7 @@
         activeNotes: new Map(), // For continuous playback
         volume: 1.0,
         recording: null,
-        playerPlayback: { lineIdx: null, playing: false, expanded: null, timer: null, raf: null, startedAt: 0, elapsed: 0, speed: 1, audio: null },
+        playerPlayback: { lineIdx: null, playing: false, expanded: null, timer: null, raf: null, startedAt: 0, elapsed: 0, speed: 1 },
         notes: [
             'C3','C#3','D3','D#3','E3','F3','F#3','G3','G#3','A3','A#3','H3',
             'C4','C#4','D4','D#4','E4','F4','F#4','G4','G#4','A4','A#4','H4',
@@ -2809,240 +2809,140 @@
     // ============================================================
     // 8.5 LINE PLAYER
     // ============================================================
-    // Playback on the "Партія" tab uses the ORIGINAL AUDIO RECORDING
-    // made in the editor. Detected notes/groups are not used to generate
-    // the sound and are not required for playback.
     function lineNotes(lineIdx) {
         const line = state.lines[lineIdx];
         return line ? (line.detectedNotes || []) : [];
     }
-
     function noteGroupIdxs(n) {
         return Array.isArray(n.groupIdxs) ? n.groupIdxs : (n.groupIdx != null ? [n.groupIdx] : []);
     }
-
     function lineDuration(lineIdx) {
-        const line = state.lines[lineIdx];
-        if (!line) return 0;
-        if (Number.isFinite(line.recordedDuration) && line.recordedDuration > 0) {
-            return line.recordedDuration;
-        }
-        // Fallback only for UI before the recording metadata is loaded.
         return lineNotes(lineIdx).reduce((s, n) => s + (n.duration || 0.1), 0);
     }
-
-    function recordedAudioUrl(audioData) {
-        if (!audioData || !audioData.base64) return null;
-        return `data:${audioData.type || 'audio/webm'};base64,${audioData.base64}`;
-    }
-
     function stopLinePlayback(collapse = true) {
         const pp = state.playerPlayback;
         if (pp.timer) clearTimeout(pp.timer);
         if (pp.raf) cancelAnimationFrame(pp.raf);
-        pp.timer = null;
-        pp.raf = null;
-
-        if (pp.audio) {
-            try {
-                pp.audio.pause();
-                pp.audio.currentTime = 0;
-                pp.audio.onloadedmetadata = null;
-                pp.audio.ontimeupdate = null;
-                pp.audio.onended = null;
-                pp.audio.onerror = null;
-            } catch (e) {}
-            pp.audio = null;
-        }
-
+        pp.timer = null; pp.raf = null;
         stopAllContinuous();
-
         if (collapse && pp.expanded !== null) pp.expanded = null;
-        pp.playing = false;
-        pp.lineIdx = null;
-        pp.elapsed = 0;
-
+        pp.playing = false; pp.lineIdx = null; pp.elapsed = 0;
         document.querySelectorAll('.player-chip.playing-group').forEach(el => el.classList.remove('playing-group'));
         document.querySelectorAll('.player-line.playing-line').forEach(el => el.classList.remove('playing-line'));
     }
-
     function setPlayerProgress(lineIdx, elapsed) {
-        const line = state.lines[lineIdx];
-        if (!line) return;
-
+        const line = state.lines[lineIdx]; if (!line) return;
         const total = lineDuration(lineIdx);
-        const clamped = Math.max(0, Math.min(total || elapsed || 0, elapsed || 0));
+        const clamped = Math.max(0, Math.min(total, elapsed));
         state.playerPlayback.elapsed = clamped;
-
         const root = playerContainer.querySelector(`.player-line[data-line="${lineIdx}"]`);
         if (!root) return;
-
         const pct = total ? clamped / total * 100 : 0;
         const progress = root.querySelector('.player-track-progress');
         const dot = root.querySelector('.player-track-dot');
         const current = root.querySelector('.player-current-time');
-
         if (progress) progress.style.width = pct + '%';
         if (dot) dot.style.left = pct + '%';
         if (current) current.textContent = formatTime(clamped);
-
-        // The recorded audio is the source of truth. Do not highlight
-        // word groups according to detected notes during recorded playback.
+        // Figure out which word group(s) correspond to whatever note in the
+        // recorded melody is sounding right now, and highlight only those —
+        // this is what keeps the highlighted word in sync with the actual
+        // recorded pitch/timing (the melody), not just a flat per-word timer.
+        const notes = lineNotes(lineIdx);
+        const activeGroups = new Set();
+        let pos = 0;
+        for (const n of notes) {
+            const d = n.duration || 0.1;
+            if (clamped >= pos && clamped < pos + d && clamped < total) {
+                noteGroupIdxs(n).forEach(gi => activeGroups.add(gi));
+            }
+            pos += d;
+        }
         root.querySelectorAll('.player-chip').forEach(chip => {
-            chip.classList.remove('playing-group');
+            const gi = parseInt(chip.dataset.group);
+            chip.classList.toggle('playing-group', activeGroups.has(gi));
         });
     }
-
-    function formatTime(sec) {
-        sec = Math.max(0, sec || 0);
-        return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
-    }
-
+    function formatTime(sec) { sec = Math.max(0, sec || 0); return `${Math.floor(sec/60)}:${String(Math.floor(sec%60)).padStart(2,'0')}`; }
     function playLineFrom(lineIdx, startAt = 0) {
-        const line = state.lines[lineIdx];
-        if (!line || !line.audioData) return;
-
+        const line = state.lines[lineIdx]; if (!line || !line.audioData) return;
+        const notes = lineNotes(lineIdx);
+        if (!notes.length) return;
         stopLinePlayback(false);
-
-        const url = recordedAudioUrl(line.audioData);
-        if (!url) return;
-
-        const audio = new Audio(url);
-        audio.preload = 'auto';
-        audio.volume = Math.max(0, Math.min(1, state.volume));
-        audio.playbackRate = state.playerPlayback.speed || 1;
-
         state.playerPlayback.lineIdx = lineIdx;
         state.playerPlayback.expanded = lineIdx;
         state.playerPlayback.playing = true;
-        state.playerPlayback.elapsed = Math.max(0, startAt || 0);
-        state.playerPlayback.audio = audio;
-
-        audio.onloadedmetadata = () => {
-            if (state.playerPlayback.audio !== audio) return;
-
-            line.recordedDuration = audio.duration || 0;
-            const safeStart = Math.max(0, Math.min(audio.duration || 0, startAt || 0));
-            audio.currentTime = safeStart;
-            state.playerPlayback.elapsed = safeStart;
-            setPlayerProgress(lineIdx, safeStart);
-            renderPlayer();
-
-            const playPromise = audio.play();
-            if (playPromise?.catch) {
-                playPromise.catch(err => {
-                    console.warn('Recorded audio playback error:', err);
-                    stopLinePlayback(false);
-                    renderPlayer();
-                });
-            }
-        };
-
-        audio.ontimeupdate = () => {
-            if (state.playerPlayback.audio !== audio) return;
-            line.recordedDuration = audio.duration || line.recordedDuration || 0;
-            setPlayerProgress(lineIdx, audio.currentTime);
-        };
-
-        audio.onended = () => {
-            if (state.playerPlayback.audio !== audio) return;
-            const duration = audio.duration || lineDuration(lineIdx);
-            state.playerPlayback.playing = false;
-            state.playerPlayback.elapsed = duration;
-            line.recordedDuration = duration;
-            state.playerPlayback.audio = null;
-            if (state.playerPlayback.raf) cancelAnimationFrame(state.playerPlayback.raf);
-            state.playerPlayback.raf = null;
-            setPlayerProgress(lineIdx, duration);
-            renderPlayer();
-        };
-
-        audio.onerror = () => {
-            if (state.playerPlayback.audio !== audio) return;
-            console.warn('Не вдалося відтворити запис рядка.');
-            stopLinePlayback(false);
-            renderPlayer();
-        };
-
-        renderPlayer();
-
-        // If metadata is already available immediately, start without waiting
-        // for another event loop turn.
-        if (audio.readyState >= 1) {
-            audio.onloadedmetadata();
+        state.playerPlayback.elapsed = Math.min(startAt, lineDuration(lineIdx));
+        state.playerPlayback.startedAt = performance.now();
+        const speed = state.playerPlayback.speed || 1;
+        let elapsed = state.playerPlayback.elapsed;
+        let pos = 0;
+        for (let i = 0; i < notes.length; i++) {
+            const n = notes[i];
+            const d = n.duration || 0.1;
+            if (elapsed >= pos + d) { pos += d; continue; }
+            const remaining = pos + d - elapsed;
+            if (n.note) playNote(n.note, Math.max(0.08, remaining / speed));
+            const delay = remaining * 1000 / speed;
+            state.playerPlayback.timer = setTimeout(() => playNextNote(lineIdx, i + 1), delay);
+            break;
         }
+        renderPlayer();
+        requestAnimationFrame(playerAnimationFrame);
     }
-
+    function playNextNote(lineIdx, noteIdx) {
+        if (!state.playerPlayback.playing || state.playerPlayback.lineIdx !== lineIdx) return;
+        const notes = lineNotes(lineIdx);
+        if (noteIdx >= notes.length) { stopLinePlayback(false); setPlayerProgress(lineIdx, lineDuration(lineIdx)); renderPlayer(); return; }
+        const before = notes.slice(0, noteIdx).reduce((s, n) => s + (n.duration || 0.1), 0);
+        state.playerPlayback.elapsed = before;
+        state.playerPlayback.startedAt = performance.now();
+        const n = notes[noteIdx];
+        const d = n.duration || 0.1;
+        if (n.note) playNote(n.note, d / (state.playerPlayback.speed || 1));
+        state.playerPlayback.timer = setTimeout(() => playNextNote(lineIdx, noteIdx + 1), d * 1000 / (state.playerPlayback.speed || 1));
+    }
     function playerAnimationFrame() {
         const pp = state.playerPlayback;
-        if (!pp.playing || pp.lineIdx === null || !pp.audio) return;
-
-        const audio = pp.audio;
-        const current = Number.isFinite(audio.currentTime) ? audio.currentTime : pp.elapsed;
-        setPlayerProgress(pp.lineIdx, current);
-
-        if (audio.ended) return;
-        pp.raf = requestAnimationFrame(playerAnimationFrame);
-    }
-
-    function togglePlayerLine(lineIdx) {
-        const line = state.lines[lineIdx];
-
-        if (state.playerPlayback.expanded === lineIdx) {
-            stopLinePlayback(true);
+        if (!pp.playing || pp.lineIdx === null) return;
+        const elapsed = pp.elapsed + (performance.now() - pp.startedAt) / 1000 * (pp.speed || 1);
+        setPlayerProgress(pp.lineIdx, elapsed);
+        if (elapsed >= lineDuration(pp.lineIdx)) {
+            const finishedLine = pp.lineIdx;
+            if (pp.timer) clearTimeout(pp.timer);
+            pp.timer = null;
+            pp.playing = false;
+            pp.elapsed = lineDuration(finishedLine);
+            pp.lineIdx = finishedLine;
+            setPlayerProgress(finishedLine, pp.elapsed);
             renderPlayer();
             return;
         }
-
-        // Playback depends ONLY on the recording saved in the editor.
-        // Detected notes and their group bindings are not required.
-        if (!line || !line.audioData) return;
-
+        pp.raf = requestAnimationFrame(playerAnimationFrame);
+    }
+    function togglePlayerLine(lineIdx) {
+        const line = state.lines[lineIdx];
+        if (state.playerPlayback.expanded === lineIdx) { stopLinePlayback(true); renderPlayer(); return; }
+        // Only lines with a recorded/analyzed melody can be expanded and
+        // played — without a recording there is nothing to play back.
+        if (!line || !line.audioData || !lineNotes(lineIdx).length) return;
         stopLinePlayback(true);
         state.playerPlayback.speed = 1;
         playLineFrom(lineIdx, 0);
     }
-
     function seekLinePlayer(lineIdx, ratio) {
-        const line = state.lines[lineIdx];
-        if (!line || !line.audioData) return;
-
-        const total = lineDuration(lineIdx);
-        const at = Math.max(0, Math.min(1, ratio)) * total;
-        const pp = state.playerPlayback;
-
-        if (pp.lineIdx === lineIdx && pp.audio) {
-            try {
-                pp.audio.currentTime = at;
-                pp.elapsed = at;
-                if (!pp.playing) {
-                    pp.play().catch(() => {});
-                    pp.playing = true;
-                }
-            } catch (e) {}
-            setPlayerProgress(lineIdx, at);
-            return;
-        }
-
-        pp.lineIdx = lineIdx;
-        pp.expanded = lineIdx;
-        pp.elapsed = at;
-        renderPlayer();
-        setPlayerProgress(lineIdx, at);
+        const total = lineDuration(lineIdx); const at = Math.max(0, Math.min(1, ratio)) * total;
+        if (state.playerPlayback.lineIdx === lineIdx && state.playerPlayback.playing) playLineFrom(lineIdx, at);
+        else { state.playerPlayback.lineIdx = lineIdx; state.playerPlayback.expanded = lineIdx; state.playerPlayback.elapsed = at; renderPlayer(); setPlayerProgress(lineIdx, at); }
     }
-
     function switchPlayerLine(delta) {
         const current = state.playerPlayback.expanded ?? 0;
-        const candidates = state.lines
-            .map((l, i) => ({ l, i }))
-            .filter(x => !x.l.isEmpty && x.l.groups.length && x.l.audioData);
-
-        const idx = candidates.findIndex(x => x.i === current);
-        const next = candidates[Math.max(0, Math.min(candidates.length - 1, idx + delta))];
+        const candidates = state.lines.map((l,i)=>({l,i})).filter(x=>!x.l.isEmpty && x.l.groups.length && x.l.audioData && lineNotes(x.i).length);
+        const idx = candidates.findIndex(x=>x.i === current);
+        const next = candidates[Math.max(0, Math.min(candidates.length-1, idx + delta))];
         if (!next) return;
-
         const targetEl = playerContainer.querySelector(`.player-line[data-line="${next.i}"]`);
-        targetEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        targetEl?.scrollIntoView({ behavior:'smooth', block:'center' });
         playLineFrom(next.i, 0);
     }
 
@@ -3053,50 +2953,42 @@
             playerGroupCount.textContent = '0 груп';
             return;
         }
-
         let totalGroups = 0;
         let html = '';
-
+        let displayLineNumber = 0;
         for (let li = 0; li < state.lines.length; li++) {
             const line = state.lines[li];
-            if (line.isEmpty) {
-                html += `<div class="player-line empty-line"></div>`;
-                continue;
-            }
+            if (line.isEmpty) { html += `<div class="player-line empty-line"></div>`; continue; }
             if (!line.groups.length) continue;
-
             totalGroups += line.groups.length;
             const expanded = state.playerPlayback.expanded === li;
-
             html += `<div class="player-line${state.playerPlayback.lineIdx===li && state.playerPlayback.playing?' playing-line':''}" data-line="${li}">`;
             html += `<div class="player-line-head">`;
-
-            // IMPORTANT: a recording alone is enough to enable playback.
-            // There is intentionally no dependency on detectedNotes/groupIdxs.
-            const hasAudio = !!line.audioData;
-            html += `<button class="player-line-play${expanded?' expanded':''}${hasAudio?'':' disabled'}" data-line-play="${li}" title="${hasAudio?'Програти запис':'Немає запису для цього рядка'}">▶</button>`;
-
+            const hasAudio = !!line.audioData && lineNotes(li).length > 0;
+            html += `<button class="player-line-play${expanded?' expanded':''}${hasAudio?'':' disabled'}" data-line-play="${li}" title="${hasAudio?'Програти рядок':'Немає запису для цього рядка'}">▶</button>`;
             html += `<span class="player-line-label">${state.lines.slice(0, li + 1).filter(l => !l.isEmpty && ((l.rawText ?? '').trim().length || l.groups.length)).length}</span>`;
             html += `<div class="player-chips">`;
-
             for (let gi = 0; gi < line.groups.length; gi++) {
                 const group = line.groups[gi];
                 const note = group.note;
-                html += `<div class="player-chip" data-group="${gi}">`;
-                html += `<span>${escapeHtml(group.words.join(' '))}</span>`;
-                if (toggleNotes.checked && note) {
-                    html += `<span class="note-label">${escapeHtml(note)}</span>`;
-                }
+                const displayText = group.words.join(' ');
+                const groupId = getGroupId(li, gi);
+                const boundNotes = groupDetectedIds(group)
+                    .map(id => (line.detectedNotes || []).find(n => n.id === id))
+                    .filter(Boolean);
+                const hasNote = boundNotes.length > 0 || note !== null;
+                const noteDisplay = boundNotes.length
+                    ? boundNotes.map(n => n.note.replace(/\d/, '')).join('·')
+                    : (hasNote ? note.replace(/\d/, '') : '—');
+                html += `<div class="player-chip" data-group-id="${groupId}" data-line="${li}" data-group="${gi}" data-note="${note || ''}">${escapeHtml(displayText)}`;
+                if (hasNote) html += `<span class="note-label">${noteDisplay}</span>`;
                 html += `</div>`;
             }
-
             html += `</div></div>`;
-
             if (expanded) {
                 const total = lineDuration(li);
-                const elapsed = state.playerPlayback.lineIdx === li ? state.playerPlayback.elapsed : 0;
-                const pct = total ? elapsed / total * 100 : 0;
-
+                const elapsed = state.playerPlayback.lineIdx===li ? state.playerPlayback.elapsed : 0;
+                const pct = total ? elapsed/total*100 : 0;
                 html += `<div class="player-line-player" data-player="${li}">`;
                 html += `<div class="player-track" data-seek-line="${li}"><div class="player-track-progress" style="width:${pct}%"></div><div class="player-track-dot" style="left:${pct}%"></div></div>`;
                 html += `<div class="player-time"><span class="player-current-time">${formatTime(elapsed)}</span><span>${formatTime(total)}</span></div>`;
@@ -3107,64 +2999,41 @@
                 html += `<div class="player-speed">Швидкість <input type="range" min="0.333" max="1" step="0.001" value="${state.playerPlayback.speed||1}" data-speed-line="${li}"><span>${(state.playerPlayback.speed||1).toFixed(2)}×</span></div>`;
                 html += `</div></div>`;
             }
-
             html += `</div>`;
         }
-
         container.innerHTML = html;
         playerGroupCount.textContent = `${totalGroups} груп`;
-
         container.querySelectorAll('.player-line-play').forEach(btn => {
-            btn.type = 'button';
-            btn.addEventListener('pointerup', e => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (btn.classList.contains('disabled')) return;
-                const li = parseInt(btn.dataset.linePlay);
-                if (Number.isInteger(li)) togglePlayerLine(li);
-            });
+            btn.type='button';
+            btn.addEventListener('pointerup', e => { e.preventDefault(); e.stopPropagation(); if (btn.classList.contains('disabled')) return; const li=parseInt(btn.dataset.linePlay); if(Number.isInteger(li)) togglePlayerLine(li); });
         });
-
-        container.querySelectorAll('[data-prev-line]').forEach(btn =>
-            btn.addEventListener('click', () => switchPlayerLine(-1))
-        );
-        container.querySelectorAll('[data-next-line]').forEach(btn =>
-            btn.addEventListener('click', () => switchPlayerLine(1))
-        );
-        container.querySelectorAll('[data-restart-line]').forEach(btn =>
-            btn.addEventListener('click', () => playLineFrom(parseInt(btn.dataset.restartLine), 0))
-        );
-
-        container.querySelectorAll('[data-speed-line]').forEach(input => {
-            input.addEventListener('input', () => {
-                const speed = parseFloat(input.value) || 1;
-                state.playerPlayback.speed = speed;
-
-                const li = parseInt(input.dataset.speedLine);
-                const label = input.parentElement?.querySelector('span');
-                if (label) label.textContent = `${speed.toFixed(2)}×`;
-
-                if (state.playerPlayback.audio && state.playerPlayback.lineIdx === li) {
-                    state.playerPlayback.audio.playbackRate = speed;
-                }
-            });
-        });
-
+        container.querySelectorAll('[data-prev-line]').forEach(btn => btn.addEventListener('click', ()=>switchPlayerLine(-1)));
+        container.querySelectorAll('[data-next-line]').forEach(btn => btn.addEventListener('click', ()=>switchPlayerLine(1)));
+        container.querySelectorAll('[data-restart-line]').forEach(btn => btn.addEventListener('click', ()=>playLineFrom(parseInt(btn.dataset.restartLine),0)));
+        container.querySelectorAll('[data-speed-line]').forEach(input => input.addEventListener('input', ()=>{
+            const v=parseFloat(input.value); state.playerPlayback.speed=v; input.nextElementSibling.textContent=v.toFixed(2)+'×';
+        }));
         container.querySelectorAll('[data-seek-line]').forEach(track => {
-            const seek = e => {
-                const rect = track.getBoundingClientRect();
-                const ratio = rect.width ? (e.clientX - rect.left) / rect.width : 0;
-                seekLinePlayer(parseInt(track.dataset.seekLine), ratio);
-            };
-            track.addEventListener('pointerdown', e => {
-                e.preventDefault();
-                seek(e);
-            });
+            const seek = e => { const r=track.getBoundingClientRect(); seekLinePlayer(parseInt(track.dataset.seekLine),(e.clientX-r.left)/r.width); };
+            track.addEventListener('pointerdown', e=>{ track.setPointerCapture?.(e.pointerId); seek(e); });
+            track.addEventListener('pointermove', e=>{ if(e.buttons) seek(e); });
         });
+        container.querySelectorAll('.player-chip').forEach(chip => {
+            const note = chip.dataset.note, groupId = chip.dataset.groupId;
+            if (!note) { chip.style.opacity='0.5'; chip.style.cursor='not-allowed'; chip.title='Немає ноти'; return; }
+            const startHold=e=>{ e.preventDefault(); if(state.holdingId===groupId)return; stopAllContinuous(); state.holdingId=groupId; chip.classList.add('holding'); startContinuousNote(note,groupId); };
+            const endHold=e=>{ e.preventDefault(); if(state.holdingId===groupId){ stopContinuousNote(groupId); chip.classList.remove('holding'); state.holdingId=null; } };
+            chip.addEventListener('mousedown',startHold); chip.addEventListener('mouseup',endHold); chip.addEventListener('mouseleave',endHold);
+            chip.addEventListener('touchstart',startHold,{passive:false}); chip.addEventListener('touchend',endHold,{passive:false}); chip.addEventListener('touchcancel',endHold,{passive:false});
+        });
+        if (state.playerPlayback.lineIdx !== null && state.playerPlayback.expanded !== null) setPlayerProgress(state.playerPlayback.lineIdx, state.playerPlayback.elapsed);
+    }
 
-        // Keep progress moving smoothly while the original recording plays.
-        if (state.playerPlayback.playing && state.playerPlayback.audio) {
-            state.playerPlayback.raf = requestAnimationFrame(playerAnimationFrame);
+    function renderAll() {
+        if (state.currentTab === 'editor') {
+            renderGroups();
+        } else {
+            renderPlayer();
         }
     }
 
