@@ -576,19 +576,31 @@
         }
         .record-actions > * { flex: 0 0 auto; }
         .line-notes-toggle,
-        .clear-line-notes-btn {
+        .clear-line-notes-btn,
+        .record-line-btn {
             border: 1px solid var(--glass-border);
             background: var(--glass);
             color: var(--text-mid);
             border-radius: 9px;
             padding: 4px 8px;
             font-size: 11px;
+            font-family: inherit;
+            font-weight: 600;
             cursor: pointer;
         }
         .line-notes-toggle:hover,
-        .clear-line-notes-btn:hover {
+        .clear-line-notes-btn:hover,
+        .record-line-btn:hover {
             color: var(--text-hi);
             border-color: var(--accent);
+        }
+        .record-line-btn.btn-danger {
+            color: var(--danger);
+            border-color: var(--danger);
+            background: var(--danger-soft);
+        }
+        .record-line-btn.btn-danger:hover {
+            background: rgba(251, 113, 133, 0.28);
         }
         .line-notes-strip {
             position: relative;
@@ -2327,6 +2339,10 @@
         return group._detectedNoteId ? [group._detectedNoteId] : [];
     }
 
+    function noteLetter(note) {
+        return (note || '').replace(/\d/g, '');
+    }
+
     function attachDetectedNote(lineIdx, noteId, groupIdx) {
         const line = state.lines[lineIdx];
         if (!line) return;
@@ -2335,11 +2351,22 @@
         if (!detected || !target) return;
         const links = normalizeDetectedNoteLinks(line, detected);
 
-        // The same detected note may be assigned to many groups. If this group
-        // already uses another detected note, that note is replaced only here.
-        const existingIds = groupDetectedIds(target);
+        // Up to two detected-note cells sharing the same letter (pitch class,
+        // e.g. both "C") may be bound to a single word group at once. Any
+        // existing binding with a different letter, or a third note, replaces
+        // the current binding(s) instead of stacking.
+        const existingIds = groupDetectedIds(target).filter(id => id !== noteId);
+        const sameLetterIds = existingIds.filter(id => {
+            const other = line.detectedNotes.find(n => n.id === id);
+            return other && noteLetter(other.note) === noteLetter(detected.note);
+        });
+        const keepIds = (sameLetterIds.length === existingIds.length && existingIds.length < 2)
+            ? existingIds
+            : [];
+        const newIds = [...keepIds, noteId];
+
         existingIds.forEach(oldId => {
-            if (oldId === noteId) return;
+            if (newIds.includes(oldId)) return;
             const previous = line.detectedNotes.find(n => n.id === oldId);
             if (previous) {
                 normalizeDetectedNoteLinks(line, previous);
@@ -2347,10 +2374,13 @@
             }
         });
 
-        target._detectedNoteIds = [noteId];
+        target._detectedNoteIds = newIds;
         delete target._detectedNoteId;
         target.note = detected.note;
-        target.duration = detected.duration;
+        target.duration = newIds.reduce((sum, id) => {
+            const n = line.detectedNotes.find(x => x.id === id);
+            return sum + (n ? n.duration : 0);
+        }, 0) || detected.duration;
         if (!links.includes(groupIdx)) links.push(groupIdx);
         detected.groupIdxs = links;
         playNoteOnce(detected.note);
@@ -2408,7 +2438,7 @@
                 lineEl.setAttribute('x2', x2);
                 lineEl.setAttribute('y2', y2);
                 lineEl.setAttribute('stroke', 'currentColor');
-                lineEl.setAttribute('stroke-width', '0.03125mm');
+                lineEl.setAttribute('stroke-width', '2.5');
                 lineEl.setAttribute('stroke-linecap', 'round');
                 lineEl.setAttribute('opacity', '0.6');
                 svg.appendChild(lineEl);
@@ -2454,18 +2484,32 @@
             const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
             const distance = Math.hypot(dx, dy);
             const elapsed = performance.now() - drag.startedAt;
-            const isIntentionalSwipe = distance >= 100 && elapsed <= 650;
+            const isFling = distance >= 100 && elapsed <= 650;
             const under = document.elementFromPoint(e.clientX, e.clientY);
             const chip = under?.closest?.('.chip');
+            const lineBlock = visual.closest('.line-block');
+            const blockRect = lineBlock ? lineBlock.getBoundingClientRect() : null;
+            const outsideBlock = blockRect ? (
+                e.clientX < blockRect.left || e.clientX > blockRect.right ||
+                e.clientY < blockRect.top || e.clientY > blockRect.bottom
+            ) : false;
+            const isTouch = e.pointerType === 'touch';
             clearTargets();
             drag.ghost.remove();
             noteEl.classList.remove('drag-source');
             noteEl.releasePointerCapture?.(e.pointerId);
             if (drag.moved && chip && chip.closest('.line-block')?.dataset.line === String(lineIdx)) {
+                // Dropped on a group's word chip — bind it.
                 attachDetectedNote(lineIdx, noteEl.dataset.noteId, parseInt(chip.dataset.group));
-            } else if (isIntentionalSwipe) {
+            } else if (drag.moved && outsideBlock && (isTouch ? isFling : true)) {
+                // Thrown/dragged past the edge of the "words with notes" block:
+                // on touch this requires a deliberate fling, on desktop simply
+                // releasing the mouse outside the block is enough.
                 removeDetectedNote(noteEl.dataset.noteId);
             }
+            // Otherwise (dropped inside the block but not on a group chip):
+            // the note was never actually moved in the DOM — only its drag
+            // ghost was — so it naturally snaps back to its original spot.
             drag = null;
         };
         noteEl.addEventListener('pointerdown', e => {
@@ -2615,7 +2659,7 @@
             html += `<input type="text" class="line-text-input" data-line="${li}" placeholder="Текст рядка">`;
             const notes = line.detectedNotes || [];
             html += `<div class="record-actions">`;
-            html += `<button class="btn btn-secondary btn-sm record-line-btn" data-line="${li}" type="button">🎙 Додати аудіо</button>`;
+            html += `<button class="record-line-btn" data-line="${li}" type="button">🎙 Додати аудіо</button>`;
             html += `<button class="clear-line-notes-btn" data-clear-line-notes="${li}" type="button">🗑 Видалити всі ноти</button>`;
             html += `<button class="line-notes-toggle" data-toggle-notes="${li}" type="button">♫ Ноти${notes.length ? ` (${notes.length})` : ''} ${line.notesCollapsed ? '▸' : '▾'}</button>`;
             if (line.audioData) html += `<span class="line-audio-badge">● Аудіо проаналізовано</span>`;
@@ -2765,9 +2809,15 @@
     // ============================================================
     // 8.5 LINE PLAYER
     // ============================================================
-    function lineDuration(lineIdx) {
+    function lineNotes(lineIdx) {
         const line = state.lines[lineIdx];
-        return line ? line.groups.reduce((s,g) => s + (g.duration || 0.6), 0) : 0;
+        return line ? (line.detectedNotes || []) : [];
+    }
+    function noteGroupIdxs(n) {
+        return Array.isArray(n.groupIdxs) ? n.groupIdxs : (n.groupIdx != null ? [n.groupIdx] : []);
+    }
+    function lineDuration(lineIdx) {
+        return lineNotes(lineIdx).reduce((s, n) => s + (n.duration || 0.1), 0);
     }
     function stopLinePlayback(collapse = true) {
         const pp = state.playerPlayback;
@@ -2794,17 +2844,30 @@
         if (progress) progress.style.width = pct + '%';
         if (dot) dot.style.left = pct + '%';
         if (current) current.textContent = formatTime(clamped);
+        // Figure out which word group(s) correspond to whatever note in the
+        // recorded melody is sounding right now, and highlight only those —
+        // this is what keeps the highlighted word in sync with the actual
+        // recorded pitch/timing (the melody), not just a flat per-word timer.
+        const notes = lineNotes(lineIdx);
+        const activeGroups = new Set();
         let pos = 0;
-        root.querySelectorAll('.player-chip').forEach((chip, gi) => {
-            const d = line.groups[gi].duration || 0.6;
-            const active = clamped >= pos && clamped < pos + d && clamped < total;
-            chip.classList.toggle('playing-group', active);
+        for (const n of notes) {
+            const d = n.duration || 0.1;
+            if (clamped >= pos && clamped < pos + d && clamped < total) {
+                noteGroupIdxs(n).forEach(gi => activeGroups.add(gi));
+            }
             pos += d;
+        }
+        root.querySelectorAll('.player-chip').forEach(chip => {
+            const gi = parseInt(chip.dataset.group);
+            chip.classList.toggle('playing-group', activeGroups.has(gi));
         });
     }
     function formatTime(sec) { sec = Math.max(0, sec || 0); return `${Math.floor(sec/60)}:${String(Math.floor(sec%60)).padStart(2,'0')}`; }
     function playLineFrom(lineIdx, startAt = 0) {
-        const line = state.lines[lineIdx]; if (!line || !line.groups.length || !line.audioData) return;
+        const line = state.lines[lineIdx]; if (!line || !line.audioData) return;
+        const notes = lineNotes(lineIdx);
+        if (!notes.length) return;
         stopLinePlayback(false);
         state.playerPlayback.lineIdx = lineIdx;
         state.playerPlayback.expanded = lineIdx;
@@ -2814,29 +2877,30 @@
         const speed = state.playerPlayback.speed || 1;
         let elapsed = state.playerPlayback.elapsed;
         let pos = 0;
-        for (const g of line.groups) {
-            const d = g.duration || 0.6;
+        for (let i = 0; i < notes.length; i++) {
+            const n = notes[i];
+            const d = n.duration || 0.1;
             if (elapsed >= pos + d) { pos += d; continue; }
             const remaining = pos + d - elapsed;
-            if (g.note) playNote(g.note, Math.max(0.08, remaining / speed));
+            if (n.note) playNote(n.note, Math.max(0.08, remaining / speed));
             const delay = remaining * 1000 / speed;
-            state.playerPlayback.timer = setTimeout(() => playNextGroup(lineIdx, line.groups.indexOf(g) + 1), delay);
+            state.playerPlayback.timer = setTimeout(() => playNextNote(lineIdx, i + 1), delay);
             break;
         }
         renderPlayer();
         requestAnimationFrame(playerAnimationFrame);
     }
-    function playNextGroup(lineIdx, groupIdx) {
+    function playNextNote(lineIdx, noteIdx) {
         if (!state.playerPlayback.playing || state.playerPlayback.lineIdx !== lineIdx) return;
-        const line = state.lines[lineIdx];
-        if (!line || groupIdx >= line.groups.length) { stopLinePlayback(false); setPlayerProgress(lineIdx, lineDuration(lineIdx)); renderPlayer(); return; }
-        const before = line.groups.slice(0, groupIdx).reduce((s,g)=>s+(g.duration||0.6),0);
+        const notes = lineNotes(lineIdx);
+        if (noteIdx >= notes.length) { stopLinePlayback(false); setPlayerProgress(lineIdx, lineDuration(lineIdx)); renderPlayer(); return; }
+        const before = notes.slice(0, noteIdx).reduce((s, n) => s + (n.duration || 0.1), 0);
         state.playerPlayback.elapsed = before;
         state.playerPlayback.startedAt = performance.now();
-        const g = line.groups[groupIdx];
-        const d = g.duration || 0.6;
-        if (g.note) playNote(g.note, d / (state.playerPlayback.speed || 1));
-        state.playerPlayback.timer = setTimeout(() => playNextGroup(lineIdx, groupIdx + 1), d * 1000 / (state.playerPlayback.speed || 1));
+        const n = notes[noteIdx];
+        const d = n.duration || 0.1;
+        if (n.note) playNote(n.note, d / (state.playerPlayback.speed || 1));
+        state.playerPlayback.timer = setTimeout(() => playNextNote(lineIdx, noteIdx + 1), d * 1000 / (state.playerPlayback.speed || 1));
     }
     function playerAnimationFrame() {
         const pp = state.playerPlayback;
@@ -2859,9 +2923,9 @@
     function togglePlayerLine(lineIdx) {
         const line = state.lines[lineIdx];
         if (state.playerPlayback.expanded === lineIdx) { stopLinePlayback(true); renderPlayer(); return; }
-        // Only lines with a recorded/analyzed audio take can be expanded and
+        // Only lines with a recorded/analyzed melody can be expanded and
         // played — without a recording there is nothing to play back.
-        if (!line || !line.audioData) return;
+        if (!line || !line.audioData || !lineNotes(lineIdx).length) return;
         stopLinePlayback(true);
         state.playerPlayback.speed = 1;
         playLineFrom(lineIdx, 0);
@@ -2873,7 +2937,7 @@
     }
     function switchPlayerLine(delta) {
         const current = state.playerPlayback.expanded ?? 0;
-        const candidates = state.lines.map((l,i)=>({l,i})).filter(x=>!x.l.isEmpty && x.l.groups.length && x.l.audioData);
+        const candidates = state.lines.map((l,i)=>({l,i})).filter(x=>!x.l.isEmpty && x.l.groups.length && x.l.audioData && lineNotes(x.i).length);
         const idx = candidates.findIndex(x=>x.i === current);
         const next = candidates[Math.max(0, Math.min(candidates.length-1, idx + delta))];
         if (!next) return;
@@ -2900,7 +2964,7 @@
             const expanded = state.playerPlayback.expanded === li;
             html += `<div class="player-line${state.playerPlayback.lineIdx===li && state.playerPlayback.playing?' playing-line':''}" data-line="${li}">`;
             html += `<div class="player-line-head">`;
-            const hasAudio = !!line.audioData;
+            const hasAudio = !!line.audioData && lineNotes(li).length > 0;
             html += `<button class="player-line-play${expanded?' expanded':''}${hasAudio?'':' disabled'}" data-line-play="${li}" title="${hasAudio?'Програти рядок':'Немає запису для цього рядка'}">▶</button>`;
             html += `<span class="player-line-label">${state.lines.slice(0, li + 1).filter(l => !l.isEmpty && ((l.rawText ?? '').trim().length || l.groups.length)).length}</span>`;
             html += `<div class="player-chips">`;
@@ -2909,8 +2973,13 @@
                 const note = group.note;
                 const displayText = group.words.join(' ');
                 const groupId = getGroupId(li, gi);
-                const hasNote = note !== null;
-                const noteDisplay = hasNote ? note.replace(/\d/, '') : '—';
+                const boundNotes = groupDetectedIds(group)
+                    .map(id => (line.detectedNotes || []).find(n => n.id === id))
+                    .filter(Boolean);
+                const hasNote = boundNotes.length > 0 || note !== null;
+                const noteDisplay = boundNotes.length
+                    ? boundNotes.map(n => n.note.replace(/\d/, '')).join('·')
+                    : (hasNote ? note.replace(/\d/, '') : '—');
                 html += `<div class="player-chip" data-group-id="${groupId}" data-line="${li}" data-group="${gi}" data-note="${note || ''}">${escapeHtml(displayText)}`;
                 if (hasNote) html += `<span class="note-label">${noteDisplay}</span>`;
                 html += `</div>`;
