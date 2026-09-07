@@ -1,0 +1,3070 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>СолоРепетитор</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #080b11;
+            --bg-deep-2: #111826;
+            --glass: rgba(255, 255, 255, 0.055);
+            --glass-strong: rgba(255, 255, 255, 0.09);
+            --glass-hover: rgba(255, 255, 255, 0.11);
+            --glass-border: rgba(255, 255, 255, 0.14);
+            --glass-border-strong: rgba(255, 255, 255, 0.24);
+            --text-hi: #f2f6f5;
+            --text-mid: #a7b3bd;
+            --text-low: #6d7986;
+            --accent: #34e5c0;
+            --accent-soft: rgba(52, 229, 192, 0.16);
+            --accent-2: #a78bfa;
+            --warn: #fbbf24;
+            --warn-soft: rgba(251, 191, 36, 0.2);
+            --danger: #fb7185;
+            --danger-soft: rgba(251, 113, 133, 0.16);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Manrope', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: radial-gradient(ellipse 900px 600px at 15% -10%, #16223a 0%, transparent 60%),
+                        radial-gradient(ellipse 900px 700px at 100% 110%, #1b1730 0%, transparent 55%),
+                        var(--bg-deep);
+            color: var(--text-hi);
+            min-height: 100vh;
+            padding: 16px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before,
+        body::after {
+            content: "";
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(100px);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        body::before {
+            width: 460px;
+            height: 460px;
+            background: var(--accent);
+            opacity: 0.16;
+            top: -140px;
+            left: -120px;
+            animation: driftA 28s ease-in-out infinite alternate;
+        }
+
+        body::after {
+            width: 520px;
+            height: 520px;
+            background: var(--accent-2);
+            opacity: 0.14;
+            bottom: -180px;
+            right: -140px;
+            animation: driftB 34s ease-in-out infinite alternate;
+        }
+
+        @keyframes driftA {
+            from { transform: translate(0, 0); }
+            to { transform: translate(70px, 50px); }
+        }
+
+        @keyframes driftB {
+            from { transform: translate(0, 0); }
+            to { transform: translate(-60px, -40px); }
+        }
+
+        .app {
+            max-width: 900px;
+            margin: 0 auto;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.065), rgba(255, 255, 255, 0.025));
+            backdrop-filter: blur(28px) saturate(150%);
+            -webkit-backdrop-filter: blur(28px) saturate(150%);
+            border: 1px solid var(--glass-border);
+            border-radius: 28px;
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            padding: 28px;
+            position: relative;
+            overflow: hidden;
+            z-index: 1;
+        }
+
+        .app-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .app-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            color: var(--text-hi);
+        }
+
+        .app-title .icon {
+            font-size: 26px;
+            filter: drop-shadow(0 0 10px rgba(52, 229, 192, 0.3));
+        }
+
+        .tabs {
+            display: flex;
+            gap: 4px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            padding: 4px;
+            border-radius: 14px;
+            backdrop-filter: blur(12px);
+        }
+
+        .tab-btn {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 10px;
+            background: transparent;
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-mid);
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .tab-btn.active {
+            background: var(--accent-soft);
+            color: var(--text-hi);
+            box-shadow: inset 0 0 0 1px rgba(52, 229, 192, 0.45), 0 0 18px rgba(52, 229, 192, 0.15);
+        }
+
+        .tab-btn:hover:not(.active) {
+            background: rgba(255, 255, 255, 0.07);
+            color: var(--text-hi);
+        }
+
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            padding: 6px 14px;
+            border-radius: 14px;
+            backdrop-filter: blur(12px);
+        }
+
+        .volume-control .vol-icon {
+            font-size: 16px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .volume-control input[type="range"] {
+            width: 100px;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .volume-control .vol-value {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-mid);
+            width: 32px;
+            text-align: right;
+        }
+
+        .note-toggle-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-mid);
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 38px;
+            height: 22px;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            inset: 0;
+            background: var(--glass-strong);
+            border: 1px solid var(--glass-border);
+            border-radius: 22px;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+
+        .toggle-slider::before {
+            content: "";
+            position: absolute;
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            top: 2px;
+            background: var(--text-hi);
+            border-radius: 50%;
+            transition: transform 0.2s ease, background 0.2s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background: var(--accent-soft);
+            border-color: var(--accent);
+        }
+
+        .toggle-switch input:checked + .toggle-slider::before {
+            transform: translateX(16px);
+            background: var(--accent);
+        }
+
+        /* Notes are hidden by default in the "Вправа" screen until toggled on */
+        #player-container:not(.notes-visible) .note-label {
+            display: none;
+        }
+
+        .screen {
+            display: none;
+            animation: fadeSlide 0.3s ease;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        @keyframes fadeSlide {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .editor-section {
+            margin-bottom: 20px;
+        }
+
+        .editor-section label {
+            display: block;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-mid);
+            margin-bottom: 6px;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            font-size: 15px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 120px;
+            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+            background: rgba(255, 255, 255, 0.04);
+            backdrop-filter: blur(8px);
+            color: var(--text-hi);
+            line-height: 1.6;
+        }
+
+        textarea::placeholder {
+            color: var(--text-low);
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-soft);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .groups-container {
+            margin-top: 16px;
+            border: 1px solid var(--glass-border);
+            border-radius: 18px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(12px);
+            min-height: 80px;
+        }
+
+        .line-block-empty {
+            height: 22px;
+            margin-bottom: 10px;
+            border-bottom: 1px dashed var(--glass-border-strong);
+        }
+
+        .line-block {
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.025);
+            margin-bottom: 10px;
+            overflow: hidden;
+            transition: background 0.2s ease, border-color 0.2s ease;
+        }
+
+        .line-block:last-child {
+            margin-bottom: 0;
+        }
+
+        .line-block-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .line-block-header:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .line-block .collapse-toggle {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            border: none;
+            background: transparent;
+            color: var(--text-mid);
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease;
+            pointer-events: none;
+        }
+
+        .line-block.collapsed .collapse-toggle {
+            transform: rotate(-90deg);
+        }
+
+        .line-block .line-number {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-low);
+            background: var(--glass-strong);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            padding: 2px 8px;
+            flex-shrink: 0;
+        }
+
+        .line-block .line-preview {
+            display: none;
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            color: var(--text-mid);
+            font-size: 14px;
+        }
+
+        .line-block.collapsed .line-preview {
+            display: block;
+        }
+
+        .line-block-body {
+            padding: 0 14px 14px;
+        }
+
+        .line-block.collapsed .line-block-body {
+            display: none;
+        }
+
+        .line-text-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--text-hi);
+            font-family: inherit;
+            font-size: 14px;
+            margin-bottom: 10px;
+            transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+        }
+
+        .line-text-input::placeholder {
+            color: var(--text-low);
+        }
+
+        .line-text-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-soft);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            padding: 4px 0;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 30px;
+            padding: 4px 8px 4px 12px;
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text-hi);
+            transition: all 0.2s ease;
+            cursor: pointer;
+            position: relative;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+        }
+
+        .chip:hover {
+            border-color: var(--accent);
+            background: var(--glass-hover);
+        }
+
+        .chip .text {
+            white-space: nowrap;
+        }
+
+        .chip .note-badge {
+            width: 19px;
+            height: 19px;
+            border-radius: 50%;
+            border: 1px solid var(--glass-border);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-mid);
+            font-size: 9px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+            font-family: inherit;
+        }
+
+        .chip .note-badge:hover {
+            background: rgba(255, 255, 255, 0.13);
+            color: var(--text-hi);
+            transform: scale(1.05);
+        }
+
+        .chip .note-badge.has-note {
+            background: var(--accent-soft);
+            border-color: var(--accent);
+            color: var(--accent);
+            font-size: 9px;
+            font-weight: 700;
+            box-shadow: 0 0 12px rgba(52, 229, 192, 0.25);
+        }
+
+        .chip .note-badge.has-note:hover {
+            background: rgba(52, 229, 192, 0.28);
+        }
+
+        .chip .action-btn {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            color: var(--text-low);
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .chip .action-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-hi);
+            transform: scale(1.1);
+        }
+
+        .chip .action-btn.danger:hover {
+            background: var(--danger-soft);
+            color: var(--danger);
+        }
+
+        .chip .action-btn.disabled {
+            opacity: 0.25;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .chip .action-btn.merge-btn {
+            color: var(--accent);
+        }
+
+        .chip .action-btn.split-btn {
+            color: var(--warn);
+            transform: rotate(90deg);
+        }
+
+        .editor-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--glass);
+            color: var(--text-hi);
+            backdrop-filter: blur(10px);
+        }
+
+        .btn-primary {
+            background: var(--accent-soft);
+            border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: 0 0 18px rgba(52, 229, 192, 0.12);
+        }
+
+        .btn-primary:hover {
+            background: rgba(52, 229, 192, 0.26);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(52, 229, 192, 0.25);
+        }
+
+        .btn-secondary {
+            background: var(--glass);
+            border-color: var(--glass-border);
+            color: var(--text-mid);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-hi);
+        }
+
+        .btn-danger {
+            background: var(--danger-soft);
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .btn-danger:hover {
+            background: rgba(251, 113, 133, 0.28);
+        }
+
+        .btn-success {
+            background: var(--accent-soft);
+            border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: 0 0 18px rgba(52, 229, 192, 0.12);
+        }
+
+        .btn-success:hover {
+            background: rgba(52, 229, 192, 0.26);
+        }
+
+        .btn-sm {
+            padding: 6px 14px;
+            font-size: 13px;
+        }
+
+        .popup-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(5, 8, 12, 0.62);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            animation: fadeIn 0.2s ease;
+        }
+
+        .popup-overlay.open {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .popup {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04));
+            backdrop-filter: blur(30px) saturate(150%);
+            border: 1px solid var(--glass-border-strong);
+            border-radius: 24px;
+            padding: 28px 24px 24px;
+            max-width: 440px;
+            width: 90%;
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+            animation: slideUp 0.25s ease;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .popup-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .popup-header h3 {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-hi);
+        }
+
+        .popup-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-low);
+            padding: 0 4px;
+        }
+
+        .popup-close:hover {
+            color: var(--text-hi);
+        }
+
+        .note-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .octave-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-low);
+            letter-spacing: 0.3px;
+            margin: 6px 2px 2px;
+        }
+
+        .octave-label:first-child {
+            margin-top: 0;
+        }
+
+        .octave-row {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 6px;
+        }
+
+        .note-btn {
+            padding: 10px 0;
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            background: var(--glass);
+            font-family: inherit;
+            font-weight: 700;
+            font-size: 14px;
+            color: var(--text-hi);
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: center;
+        }
+
+        .note-btn:hover {
+            background: rgba(255, 255, 255, 0.11);
+            border-color: var(--accent);
+            transform: scale(1.03);
+        }
+
+        .note-btn:active {
+            transform: scale(0.95);
+        }
+
+        .note-btn.selected {
+            background: var(--accent-soft);
+            color: var(--accent);
+            border-color: var(--accent);
+            box-shadow: 0 0 12px rgba(52, 229, 192, 0.25);
+        }
+
+        .popup-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+            justify-content: flex-end;
+        }
+
+        .play-btn {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 30px;
+            padding: 8px 16px;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-hi);
+            transition: all 0.2s;
+        }
+
+        .play-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--accent);
+        }
+
+        .empty-state {
+            color: var(--text-low);
+            text-align: center;
+            padding: 30px 10px;
+            font-size: 15px;
+        }
+
+        .empty-state .big-icon {
+            font-size: 40px;
+            display: block;
+            margin-bottom: 10px;
+            filter: drop-shadow(0 0 16px rgba(52, 229, 192, 0.25));
+        }
+
+        /* Player styles */
+        .player-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            padding: 12px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            backdrop-filter: blur(12px);
+        }
+
+        .player-controls label {
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-mid);
+        }
+
+        .instrument-btn {
+            padding: 8px 16px;
+            border: 1px solid var(--glass-border);
+            border-radius: 30px;
+            background: rgba(255, 255, 255, 0.04);
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-hi);
+            backdrop-filter: blur(8px);
+        }
+
+        .instrument-btn:hover {
+            background: rgba(255, 255, 255, 0.11);
+            border-color: var(--accent);
+            transform: scale(1.05);
+        }
+
+        .instrument-btn.active {
+            background: var(--accent-soft);
+            border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: 0 0 18px rgba(52, 229, 192, 0.2);
+        }
+
+        .instrument-btn .label {
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .instrument-btn.loading {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
+        .player-line {
+            margin-bottom: 14px;
+        }
+
+        .player-line:last-child {
+            margin-bottom: 0;
+        }
+
+        .player-line.empty-line {
+            height: 32px;
+            margin-bottom: 8px;
+            border-bottom: 1px dashed var(--glass-border-strong);
+        }
+
+        .player-line-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-low);
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .player-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .player-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 8px 16px;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 30px;
+            font-size: 15px;
+            font-weight: 500;
+            color: var(--text-hi);
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.1s ease;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+            gap: 6px;
+            backdrop-filter: blur(8px);
+        }
+
+        .player-chip .note-label {
+            font-size: 13px;
+            color: var(--accent);
+            font-weight: 700;
+            background: var(--accent-soft);
+            padding: 0 8px;
+            border-radius: 12px;
+            line-height: 22px;
+        }
+
+        .player-chip.holding {
+            background: var(--warn-soft);
+            border-color: var(--warn);
+            transform: scale(1.03);
+            box-shadow: 0 4px 26px rgba(251, 191, 36, 0.35);
+        }
+
+        .player-chip:active {
+            transform: scale(0.97);
+        }
+
+        .player-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .share-notification {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: rgba(14, 19, 27, 0.8);
+            border: 1px solid var(--accent);
+            backdrop-filter: blur(18px);
+            color: var(--text-hi);
+            padding: 12px 24px;
+            border-radius: 16px;
+            font-weight: 600;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4), 0 0 22px rgba(52, 229, 192, 0.2);
+            opacity: 0;
+            transition: all 0.4s ease;
+            z-index: 2000;
+            pointer-events: none;
+        }
+
+        .share-notification.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .info-badge {
+            display: inline-block;
+            background: var(--glass-strong);
+            border: 1px solid var(--glass-border);
+            color: var(--text-mid);
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+
+        /* Player line playback */
+        #player-screen { user-select: none; -webkit-user-select: none; }
+        #player-screen input, #player-screen button { user-select: none; -webkit-user-select: none; }
+        .player-line { border: 1px solid transparent; border-radius: 14px; padding: 8px; transition: background .2s, border-color .2s; }
+        .player-line.playing-line { background: rgba(52,229,192,.045); border-color: rgba(52,229,192,.22); }
+        .player-line-head { display:flex; align-items:center; gap:8px; }
+        .player-line-play { width:32px; height:32px; border-radius:50%; border:1px solid var(--glass-border); background:var(--glass); color:var(--text-hi); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:transform .2s, background .2s, border-color .2s; flex-shrink:0; }
+        .player-line-play.expanded { transform:rotate(90deg); background:var(--accent-soft); border-color:var(--accent); color:var(--accent); }
+        .player-line-player { margin-top:10px; padding:10px; border:1px solid var(--glass-border); border-radius:14px; background:rgba(255,255,255,.025); }
+        .player-track { position:relative; width:100%; height:8px; border-radius:8px; background:rgba(255,255,255,.1); cursor:pointer; touch-action:none; }
+        .player-track-progress { position:absolute; left:0; top:0; bottom:0; width:0; border-radius:8px; background:var(--accent); pointer-events:none; }
+        .player-track-dot { position:absolute; top:50%; left:0; width:16px; height:16px; border-radius:50%; background:var(--accent); transform:translate(-50%,-50%); box-shadow:0 0 12px rgba(52,229,192,.4); pointer-events:none; }
+        .player-time { display:flex; justify-content:space-between; font-size:11px; color:var(--text-low); margin-top:6px; }
+        .player-tools { display:flex; align-items:center; gap:7px; margin-top:10px; flex-wrap:wrap; }
+        .player-mini-btn { width:34px; height:30px; border:1px solid var(--glass-border); border-radius:10px; background:var(--glass); color:var(--text-hi); cursor:pointer; }
+        .player-speed { display:flex; align-items:center; gap:7px; margin-left:auto; font-size:11px; color:var(--text-mid); }
+        .player-speed input { width:110px; accent-color:var(--accent); }
+        .player-chip.playing-group { background:var(--accent-soft); border-color:var(--accent); box-shadow:0 0 18px rgba(52,229,192,.2); transform:scale(1.02); }
+        .record-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; }
+        .record-status { font-size:12px; color:var(--text-low); }
+        .record-status.recording { color:var(--danger); }
+        .record-status.processing { color:var(--warn); }
+        .line-audio-badge { font-size:11px; color:var(--accent); opacity:.9; }
+        .line-block.draft .line-number { color:var(--accent); border-color:var(--accent); }
+
+        /* Loading indicator */
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--glass-border);
+            border-top: 2px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 6px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding-left: 5px;
+                padding-right: 5px;
+            }
+
+            .app {
+                padding-left: 8px;
+                padding-right: 8px;
+            }
+
+            /* Compact the three outer editor gaps on mobile.
+               Internal padding of line blocks and groups stays unchanged. */
+            .editor-section {
+                margin-bottom: 8px;
+            }
+
+            .groups-container {
+                margin-top: 8px;
+                padding-left: 10px;
+                padding-right: 10px;
+            }
+
+            .editor-actions {
+                margin-top: 8px;
+            }
+
+            .app-title {
+                font-size: 20px;
+            }
+
+            .tab-btn {
+                padding: 6px 14px;
+                font-size: 13px;
+            }
+
+            .chip {
+                padding: 3px 6px 3px 10px;
+                font-size: 14px;
+            }
+
+            .chip .note-badge {
+                width: 19px;
+                height: 19px;
+                font-size: 8px;
+            }
+
+            .chip .action-btn {
+                width: 22px;
+                height: 22px;
+                font-size: 14px;
+            }
+
+            .line-block-header {
+                padding: 8px 10px;
+                gap: 8px;
+            }
+
+            .line-block-body {
+                padding: 0 10px 10px;
+            }
+
+            .line-text-input {
+                font-size: 14px;
+                padding: 7px 10px;
+            }
+
+            .player-chip {
+                padding: 6px 12px;
+                font-size: 14px;
+            }
+
+            .octave-row {
+                grid-template-columns: repeat(4, 1fr);
+            }
+
+            .popup {
+                padding: 20px 16px;
+            }
+
+            .note-btn {
+                padding: 8px 0;
+                font-size: 13px;
+            }
+
+            .instrument-btn {
+                padding: 6px 12px;
+                font-size: 16px;
+            }
+
+            .instrument-btn .label {
+                font-size: 11px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .app-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+            .tabs {
+                justify-content: center;
+            }
+            .tab-btn {
+                flex: 1;
+                text-align: center;
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+            .chip {
+                font-size: 13px;
+                padding: 3px 6px 3px 10px;
+            }
+            .octave-row {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .player-controls {
+                flex-direction: row;
+                align-items: center;
+                flex-wrap: wrap;
+            }
+            .instrument-btn {
+                width: auto;
+                flex: 0 0 auto;
+                justify-content: center;
+            }
+        }
+    </style>
+
+</head>
+<body>
+
+<div class="app" id="app">
+    <div class="app-header">
+        <div class="app-title">
+            <span class="icon">🎵</span>
+            Соло репетитор
+        </div>
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="editor">Редактор</button>
+            <button class="tab-btn" data-tab="player">Партія</button>
+        </div>
+        <div class="volume-control">
+            <span class="vol-icon" id="vol-icon">🔊</span>
+            <input type="range" id="volume-slider" min="0" max="100" value="80">
+            <span class="vol-value" id="vol-value">80%</span>
+        </div>
+    </div>
+
+    <!-- EDITOR SCREEN -->
+    <div class="screen active" id="editor-screen">
+        <div class="editor-section">
+            <label for="lyrics-input">Текст пісні</label>
+            <textarea id="lyrics-input" placeholder="Поле для тексту пісні"></textarea>
+        </div>
+
+        <div class="editor-section">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:4px;">
+                <label style="margin-bottom:0;">🎼 Групи слів з нотами</label>
+                <span class="info-badge" id="group-count">0 груп</span>
+            </div>
+            <div class="groups-container" id="groups-container">
+                <!-- dynamic -->
+            </div>
+            <div class="editor-actions">
+                <button class="btn btn-primary btn-sm" id="add-line-btn">＋ Додати рядок</button>
+                <button class="btn btn-secondary btn-sm" id="clear-groups-btn">🗑 Очистити групи</button>
+                <span style="font-size:13px; color:var(--text-low); margin-left:auto;">Тап на слово – призначити ноту &nbsp; + – об'єднати &nbsp; ✂️ – розділити &nbsp; Тап на рядок – згорнути/розгорнути</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- PLAYER SCREEN -->
+    <div class="screen" id="player-screen">
+        <div style="margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <h3 style="font-size:18px; color:var(--text-hi); font-weight:700;"></h3>
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <label class="note-toggle-label" for="toggle-notes">
+                        <span class="toggle-switch">
+                            <input type="checkbox" id="toggle-notes">
+                            <span class="toggle-slider"></span>
+                        </span>
+                        Показати ноти
+                    </label>
+                    <span class="info-badge" id="player-group-count">0 груп</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Instrument selector -->
+        <div class="player-controls">
+            <label>Інструмент:</label>
+            <button class="instrument-btn active" data-instrument="acoustic_grand_piano">
+                🎹 <span class="label">Піаніно</span>
+            </button>
+            <button class="instrument-btn" data-instrument="violin">
+                🎻 <span class="label">Скрипка</span>
+            </button>
+            <button class="instrument-btn" data-instrument="trumpet">
+                🎺 <span class="label">Труба</span>
+            </button>
+            <button class="instrument-btn" data-instrument="acoustic_guitar_steel">
+                🎸 <span class="label">Гітара</span>
+            </button>
+            <button class="instrument-btn" data-instrument="acoustic_bass">
+                𝄢 <span class="label">Контрабас</span>
+            </button>
+            <button class="instrument-btn" data-instrument="sine">
+                〰️ <span class="label">Синус</span>
+            </button>
+        </div>
+
+        <div id="player-container" style="border:1px solid var(--glass-border); border-radius:18px; padding:16px; background:rgba(255,255,255,0.03); backdrop-filter:blur(12px); min-height:80px;">
+            <!-- dynamic -->
+        </div>
+        <div class="player-actions">
+            <button class="btn btn-secondary" id="back-to-editor-btn">← Назад до редактора</button>
+            <button class="btn btn-success" id="share-from-player-btn">🔗 Поділитися</button>
+        </div>
+    </div>
+</div>
+
+<!-- NOTE POPUP -->
+<div class="popup-overlay" id="note-popup">
+    <div class="popup">
+        <div class="popup-header">
+            <h3>🎼 Вибрати ноту</h3>
+            <button class="popup-close" id="popup-close">✕</button>
+        </div>
+        <div class="note-grid" id="note-grid"></div>
+        <div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap; justify-content:center;">
+            <button class="play-btn" id="popup-remove-note">✕ Зняти ноту</button>
+        </div>
+    </div>
+</div>
+
+<!-- SHARE NOTIFICATION -->
+<div class="share-notification" id="share-notification">✅ Посилання скопійовано!</div>
+
+<!-- Soundfont library -->
+<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
+
+<script>
+(function() {
+    'use strict';
+
+    // ============================================================
+    // 1. STATE
+    // ============================================================
+    const state = {
+        lines: [],
+        editing: null,
+        tempNote: null,
+        audioCtx: null,
+        holdingId: null,
+        debounceTimer: null,
+        currentTab: 'editor',
+        instrument: 'acoustic_grand_piano',
+        instrumentLoaded: false,
+        soundfont: null,
+        activeNotes: new Map(), // For continuous playback
+        volume: 1.0,
+        recording: null,
+        playerPlayback: { lineIdx: null, playing: false, expanded: null, timer: null, raf: null, startedAt: 0, elapsed: 0, speed: 1 },
+        notes: [
+            'C3','C#3','D3','D#3','E3','F3','F#3','G3','G#3','A3','A#3','H3',
+            'C4','C#4','D4','D#4','E4','F4','F#4','G4','G#4','A4','A#4','H4',
+            'C5','C#5','D5','D#5','E5','F5','F#5','G5','G#5','A5','A#5','H5'
+        ],
+        // Map European H to B for Soundfont
+        noteMap: {
+            'H3': 'B3', 'H4': 'B4', 'H5': 'B5'
+        }
+    };
+
+    // Icon + display label per instrument (used both for the initial buttons
+    // and for refreshing button contents after a soundfont finishes loading)
+    const INSTRUMENTS = {
+        acoustic_grand_piano: { icon: '🎹', label: 'Піаніно' },
+        violin: { icon: '🎻', label: 'Скрипка' },
+        trumpet: { icon: '🎺', label: 'Труба' },
+        acoustic_guitar_steel: { icon: '🎸', label: 'Гітара' },
+        acoustic_bass: { icon: '𝄢', label: 'Контрабас' },
+        sine: { icon: '〰️', label: 'Синус' }
+    };
+
+    // ============================================================
+    // 2. DOM refs
+    // ============================================================
+    const $ = id => document.getElementById(id);
+    const lyricsInput = $('lyrics-input');
+    const groupsContainer = $('groups-container');
+    const playerContainer = $('player-container');
+    const notePopup = $('note-popup');
+    const noteGrid = $('note-grid');
+    const popupClose = $('popup-close');
+    const popupRemoveNote = $('popup-remove-note');
+    const clearGroupsBtn = $('clear-groups-btn');
+    const backToEditorBtn = $('back-to-editor-btn');
+    const shareFromPlayerBtn = $('share-from-player-btn');
+    const groupCount = $('group-count');
+    const playerGroupCount = $('player-group-count');
+    const shareNotif = $('share-notification');
+    const volumeSlider = $('volume-slider');
+    const volIcon = $('vol-icon');
+    const volValue = $('vol-value');
+    const toggleNotes = $('toggle-notes');
+
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const screens = {
+        editor: $('editor-screen'),
+        player: $('player-screen')
+    };
+
+    // ============================================================
+    // 3. AUDIO ENGINE with Soundfont
+    // ============================================================
+    function getAudioCtx() {
+        if (!state.audioCtx) {
+            state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        return state.audioCtx;
+    }
+
+    function getMasterGain() {
+    const ctx = getAudioCtx();
+
+    if (!state.masterGain) {
+        state.masterGain = ctx.createGain();
+
+        // 2x amplification at 100% volume (+6 dB)
+        state.masterGain.gain.value = state.volume * 20.0;
+
+        // Strong limiter to prevent digital clipping
+        const limiter = ctx.createDynamicsCompressor();
+
+        limiter.threshold.value = -3;
+        limiter.knee.value = 5;
+        limiter.ratio.value = 20;
+        limiter.attack.value = 0.001;
+        limiter.release.value = 0.12;
+
+        state.masterGain.connect(limiter);
+        limiter.connect(ctx.destination);
+    }
+
+    return state.masterGain;
+    }
+    
+    function getSoundfontNote(note) {
+        // Convert European H to B for Soundfont
+        return state.noteMap[note] || note;
+    }
+
+    // Load instrument
+    function loadInstrument(instrumentName) {
+        return new Promise((resolve, reject) => {
+            const ctx = getAudioCtx();
+            
+            // If it's sine wave, we don't need to load soundfont
+            if (instrumentName === 'sine') {
+                state.instrumentLoaded = true;
+                state.soundfont = null;
+                resolve();
+                return;
+            }
+
+            // Show loading state
+            document.querySelectorAll('.instrument-btn').forEach(btn => {
+                if (btn.dataset.instrument === instrumentName) {
+                    btn.classList.add('loading');
+                    btn.innerHTML = `<span class="loading-spinner"></span> <span class="label">Завантаження...</span>`;
+                }
+            });
+
+            // Load soundfont instrument
+            Soundfont.instrument(ctx, instrumentName, {
+                gain: 1.6,
+                destination: getMasterGain()
+            }).then((instrument) => {
+                state.soundfont = instrument;
+                state.instrumentLoaded = true;
+                
+                // Reset button text
+                document.querySelectorAll('.instrument-btn').forEach(btn => {
+                    btn.classList.remove('loading');
+                    if (btn.dataset.instrument === instrumentName) {
+                        const meta = INSTRUMENTS[btn.dataset.instrument] || { icon: '🎵', label: btn.dataset.instrument };
+                        btn.innerHTML = `${meta.icon} <span class="label">${meta.label}</span>`;
+                    }
+                });
+                
+                console.log(`✅ Інструмент "${instrumentName}" завантажено`);
+                resolve();
+            }).catch((err) => {
+                console.error('❌ Помилка завантаження інструменту:', err);
+                // Fallback to sine wave
+                state.soundfont = null;
+                state.instrumentLoaded = true;
+                
+                document.querySelectorAll('.instrument-btn').forEach(btn => {
+                    btn.classList.remove('loading');
+                });
+                
+                reject(err);
+            });
+        });
+    }
+
+    // Max time a note may sound when assigning/previewing it (note badge click,
+    // "▶ Програти" in the popup). Kept comfortably under 1s to leave room for
+    // the release tail, and enforced with a hard stop() below because some
+    // soundfont samples keep ringing past their scheduled "duration".
+    const NOTE_PREVIEW_DURATION = 0.5;
+
+    // FIX: soundfont-player's play() signature is play(note, time, duration, options) —
+    // it is NOT play(note, options). The previous code passed the options object as the
+    // "time" argument, which silently broke (or async-threw) real instrument playback.
+    function playSoundfontNote(noteName, duration = NOTE_PREVIEW_DURATION) {
+        const ctx = getAudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+
+        if (state.instrument === 'sine' || !state.soundfont) {
+            // Fallback to oscillator
+            playOscillatorNote(noteName, duration);
+            return;
+        }
+
+        try {
+            const sfNote = getSoundfontNote(noteName);
+            const note = state.soundfont.play(sfNote, 0, duration, {
+                gain: 1.4,
+                release: 0.15
+            });
+            // Hard safety cutoff: some soundfont samples keep ringing past the
+            // scheduled duration/release, so force-stop the voice no later
+            // than 1 second in total regardless.
+            if (note && typeof note.stop === 'function') {
+                const hardStopMs = Math.min(duration * 1000 + 150, 1000);
+                setTimeout(() => {
+                    try { note.stop(); } catch (e) {}
+                }, hardStopMs);
+            }
+            return note;
+        } catch (e) {
+            console.warn('Soundfont playback error, using oscillator:', e);
+            playOscillatorNote(noteName, duration);
+        }
+    }
+
+    function playContinuousSoundfontNote(noteName, groupId) {
+        const ctx = getAudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+
+        stopContinuousNote(groupId);
+
+        if (state.instrument === 'sine' || !state.soundfont) {
+            // Use oscillator for continuous
+            const result = createOscillatorNode(noteName, true);
+            if (result) {
+                state.activeNotes.set(groupId, result);
+            }
+            return;
+        }
+
+        try {
+            const sfNote = getSoundfontNote(noteName);
+            // No fixed duration here — we hold the note open and stop it manually
+            // (via the returned player's .stop()) when the user releases the chip.
+            const note = state.soundfont.play(sfNote, 0, undefined, {
+                gain: 1.2
+            });
+
+            // Store the note object for stopping
+            state.activeNotes.set(groupId, {
+                type: 'soundfont',
+                note: note,
+                stop: () => {
+                    try { note.stop(); } catch (e) {}
+                }
+            });
+        } catch (e) {
+            console.warn('Continuous soundfont error, using oscillator:', e);
+            const result = createOscillatorNode(noteName, true);
+            if (result) {
+                state.activeNotes.set(groupId, result);
+            }
+        }
+    }
+
+    // ============================================================
+    // 4. OSCILLATOR FALLBACK (for sine wave and errors)
+    // ============================================================
+    const noteFreq = {
+        'C3': 130.81, 'C#3': 138.59, 'D3': 146.83, 'D#3': 155.56,
+        'E3': 164.81, 'F3': 174.61, 'F#3': 185.00, 'G3': 196.00,
+        'G#3': 207.65, 'A3': 220.00, 'A#3': 233.08, 'H3': 246.94,
+        'C4': 261.63, 'C#4': 277.18, 'D4': 293.66, 'D#4': 311.13,
+        'E4': 329.63, 'F4': 349.23, 'F#4': 369.99, 'G4': 392.00,
+        'G#4': 415.30, 'A4': 440.00, 'A#4': 466.16, 'H4': 493.88,
+        'C5': 523.25, 'C#5': 554.37, 'D5': 587.33, 'D#5': 622.25,
+        'E5': 659.25, 'F5': 698.46, 'F#5': 739.99, 'G5': 783.99,
+        'G#5': 830.61, 'A5': 880.00, 'A#5': 932.33, 'H5': 987.77
+    };
+
+    function createOscillatorNode(noteName, isContinuous = false) {
+        const ctx = getAudioCtx();
+        const freq = noteFreq[noteName];
+        if (!freq) return null;
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc.type = state.instrument === 'sine' ? 'sine' : 'triangle';
+        osc.frequency.value = freq;
+        
+        const now = ctx.currentTime;
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.9, now + 0.01);
+        gain.gain.setValueAtTime(0.9, now + 0.1);
+        
+        osc.connect(gain);
+        gain.connect(getMasterGain());
+        osc.start(now);
+        
+        return {
+            type: 'oscillator',
+            osc: osc,
+            gain: gain,
+            stop: () => {
+                try {
+                    const stopTime = gain.context.currentTime;
+                    gain.gain.setValueAtTime(gain.gain.value, stopTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, stopTime + 0.04);
+                    osc.stop(stopTime + 0.05);
+                } catch (e) {}
+            }
+        };
+    }
+
+    function playOscillatorNote(noteName, duration = 0.6) {
+        const ctx = getAudioCtx();
+        const freq = noteFreq[noteName];
+        if (!freq) return;
+
+        if (ctx.state === 'suspended') ctx.resume();
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc.type = state.instrument === 'sine' ? 'sine' : 'triangle';
+        osc.frequency.value = freq;
+        
+        const now = ctx.currentTime;
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(1.0, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        
+        osc.connect(gain);
+        gain.connect(getMasterGain());
+        osc.start(now);
+        osc.stop(now + duration);
+    }
+
+    // ============================================================
+    // 5. MAIN AUDIO FUNCTIONS
+    // ============================================================
+    // Contrabass is a transposing instrument: written pitch sounds an octave
+    // lower than notated. Our note range (C4-H5) is well above the natural
+    // register of a real double bass, so without this shift the soundfont
+    // samples get stretched way up and lose their character. Shifting playback
+    // down an octave for this instrument only gives it its proper, natural tone.
+    function shiftOctaveDown(noteName) {
+        const match = noteName.match(/^([A-H]#?)(\d)$/);
+        if (!match) return noteName;
+        const [, letter, octave] = match;
+        return `${letter}${parseInt(octave, 10) - 1}`;
+    }
+
+    function getPlaybackNote(noteName) {
+        if (state.instrument === 'acoustic_bass') {
+            return shiftOctaveDown(noteName);
+        }
+        return noteName;
+    }
+
+    function playNote(noteName, duration = NOTE_PREVIEW_DURATION) {
+        const playbackNote = getPlaybackNote(noteName);
+        if (state.instrument === 'sine' || !state.soundfont || !state.instrumentLoaded) {
+            playOscillatorNote(playbackNote, duration);
+        } else {
+            playSoundfontNote(playbackNote, duration);
+        }
+    }
+
+    function startContinuousNote(noteName, groupId) {
+        const playbackNote = getPlaybackNote(noteName);
+        if (state.instrument === 'sine' || !state.soundfont || !state.instrumentLoaded) {
+            const result = createOscillatorNode(playbackNote, true);
+            if (result) {
+                state.activeNotes.set(groupId, result);
+            }
+        } else {
+            playContinuousSoundfontNote(playbackNote, groupId);
+        }
+    }
+
+    function stopContinuousNote(groupId) {
+        const entry = state.activeNotes.get(groupId);
+        if (entry) {
+            entry.stop();
+            state.activeNotes.delete(groupId);
+        }
+    }
+
+    function stopAllContinuous() {
+        for (const [id] of state.activeNotes) {
+            stopContinuousNote(id);
+        }
+        state.holdingId = null;
+    }
+
+    function playNoteOnce(noteName) {
+        playNote(noteName, NOTE_PREVIEW_DURATION);
+    }
+
+    // ============================================================
+    // 6. TEXT PARSING & SMART GROUP PRESERVATION
+    // ============================================================
+    function isCyrillic(char) {
+        return /[\u0400-\u04FF]/.test(char);
+    }
+
+    // Cleans pasted/entered song text.
+    //
+    // Chord lines usually contain Latin note names (E, H, F#, G#m, Bb, etc.)
+    // and spacing/other chord symbols. Since the lyrics themselves are expected
+    // to be Cyrillic, keep only Cyrillic text, spaces and song punctuation.
+    // A line that contains no Cyrillic characters (for example "E   H   F#"
+    // or "Chorus:") becomes an empty line. Original empty lines are kept.
+    function cleanLyricsLine(line) {
+        // First remove Latin letters. This also removes chord names embedded
+        // among spaces, leaving their #/b/m/etc. behind temporarily.
+        let cleaned = line.replace(/[A-Za-z]/g, '');
+
+        // Keep only Cyrillic characters, whitespace and punctuation that can
+        // legitimately belong to the lyrics. This removes chord leftovers
+        // such as #, ♭, digits, slashes and other formatting characters.
+        cleaned = cleaned.replace(/[^\u0400-\u04FF\s.,!?;:()\-–—«»"']/g, '');
+
+        // If there is no actual Cyrillic lyric text, discard the whole line.
+        // This removes chord-only lines and headings such as "Chorus:" while
+        // preserving genuinely empty lines between sections.
+        if (!/[\u0400-\u04FF]/.test(cleaned)) {
+            return '';
+        }
+
+        // Normalize excessive whitespace introduced by chord columns.
+        return cleaned.replace(/[ \t]+/g, ' ').trim();
+    }
+
+    function cleanLyricsText(text) {
+        // Keep genuinely empty lines, but REMOVE non-empty lines that turn into
+        // nothing after cleaning (chord-only lines, "Chorus:", etc.). This is
+        // important: a chord line must not accidentally become an extra blank
+        // line, while blank lines intentionally used between song sections stay.
+        return text.split('\n')
+            .filter(line => {
+                if (line.trim() === '') return true;
+                return cleanLyricsLine(line) !== '';
+            })
+            .map(cleanLyricsLine)
+            .join('\n');
+    }
+
+    // Backward-compatible alias used by the live input handlers.
+    function removeLatin(text) {
+        return cleanLyricsText(text);
+    }
+
+    function isPunctuation(char) {
+        return /[.,!?;:()\-–—«»"']/.test(char);
+    }
+
+    function isWordChar(char) {
+        return isCyrillic(char) || isPunctuation(char);
+    }
+
+    function splitIntoWords(line) {
+        const result = [];
+        let current = '';
+        
+        for (let i = 0; i < line.length; i++) {
+            const char = line[i];
+            if (isWordChar(char)) {
+                current += char;
+            } else {
+                if (current.length > 0 && /[\u0400-\u04FF]/.test(current)) {
+                    result.push(current);
+                }
+                current = '';
+            }
+        }
+        
+        if (current.length > 0 && /[\u0400-\u04FF]/.test(current)) {
+            result.push(current);
+        }
+        
+        return result;
+    }
+
+    function mergePunctuation(words) {
+        const result = [];
+        let current = '';
+        for (const w of words) {
+            if (w.length === 1 && isPunctuation(w)) {
+                if (current.length > 0) {
+                    current += w;
+                } else {
+                    result.push(w);
+                }
+            } else {
+                if (current.length > 0) {
+                    result.push(current);
+                }
+                current = w;
+            }
+        }
+        if (current.length > 0) result.push(current);
+        return result;
+    }
+
+    function parseTextToLines(text) {
+        return text.split('\n');
+    }
+
+    function wordsFromLine(line) {
+        return splitIntoWords(line);
+    }
+
+    function getWordsFromGroups(groups) {
+        return groups.flatMap(g => g.words);
+    }
+
+    function isLineEmpty(line) {
+        return line.trim().length === 0;
+    }
+
+    // Computes the groups for a single line's text, reusing notes from the
+    // previous groups of that same line wherever the words still line up.
+    // Shared by the full-text rebuild below and by single-line edits made
+    // directly inside a line block's own text field.
+    function computeGroupsForLineText(newLineText, existingGroups) {
+        const newLineWords = mergePunctuation(wordsFromLine(newLineText));
+        const existingWords = existingGroups.length > 0 ? getWordsFromGroups(existingGroups) : [];
+
+        if (existingGroups.length === 0 || newLineWords.join(' ') !== existingWords.join(' ')) {
+            const newGroups = [];
+            let wordIdx = 0;
+
+            for (const oldGroup of existingGroups) {
+                const oldWords = oldGroup.words;
+                const oldWordCount = oldWords.length;
+                const possibleMatch = newLineWords.slice(wordIdx, wordIdx + oldWordCount);
+
+                if (possibleMatch.length === oldWordCount &&
+                    possibleMatch.join(' ') === oldWords.join(' ')) {
+                    newGroups.push({
+                        words: oldWords,
+                        note: oldGroup.note
+                    });
+                    wordIdx += oldWordCount;
+                } else {
+                    const remainingWords = newLineWords.slice(wordIdx);
+                    for (const w of remainingWords) {
+                        let foundNote = null;
+                        for (const oldW of oldWords) {
+                            if (w === oldW && oldWords.indexOf(w) === 0) {
+                                foundNote = oldGroup.note;
+                                break;
+                            }
+                        }
+                        newGroups.push({
+                            words: [w],
+                            note: foundNote
+                        });
+                    }
+                    wordIdx = newLineWords.length;
+                    break;
+                }
+            }
+
+            if (wordIdx < newLineWords.length) {
+                const remaining = newLineWords.slice(wordIdx);
+                for (const w of remaining) {
+                    let foundNote = null;
+                    for (const oldGroup of existingGroups) {
+                        if (oldGroup.words.includes(w) && oldGroup.words.indexOf(w) === 0) {
+                            foundNote = oldGroup.note;
+                            break;
+                        }
+                    }
+                    newGroups.push({
+                        words: [w],
+                        note: foundNote
+                    });
+                }
+            }
+
+            return newGroups;
+        }
+
+        return existingGroups.map(g => ({
+            words: [...g.words],
+            note: g.note
+        }));
+    }
+
+    function rebuildGroupsPreservingNotes(newText) {
+        const newLines = parseTextToLines(newText);
+
+        if (!state.lines || state.lines.length === 0) {
+            state.lines = newLines.map(line => {
+                if (isLineEmpty(line)) {
+                    return { groups: [], isEmpty: true, collapsed: false };
+                }
+                return {
+                    groups: mergePunctuation(wordsFromLine(line)).map(w => ({
+                        words: [w],
+                        note: null
+                    })),
+                    isEmpty: false,
+                    collapsed: false
+                };
+            });
+            return;
+        }
+
+        const preservedLines = [];
+
+        for (let li = 0; li < newLines.length; li++) {
+            const newLine = newLines[li];
+            const existingLine = state.lines[li];
+            const prevCollapsed = existingLine ? !!existingLine.collapsed : false;
+
+            if (isLineEmpty(newLine)) {
+                preservedLines.push({ groups: [], isEmpty: true, collapsed: prevCollapsed });
+                continue;
+            }
+
+            const existingGroups = (existingLine && !existingLine.isEmpty) ? existingLine.groups : [];
+            const newGroups = computeGroupsForLineText(newLine, existingGroups);
+
+            preservedLines.push({ groups: newGroups, isEmpty: false, collapsed: prevCollapsed });
+        }
+
+        state.lines = preservedLines;
+    }
+
+    // Updates one line's state and its visible groups immediately while the
+    // user is typing. The line input itself is NOT re-rendered, so focus and
+    // cursor position are preserved.
+    function handleLineTextLiveEdit(lineIdx, newLineText) {
+        const line = state.lines[lineIdx];
+        if (!line) return;
+
+        if (isLineEmpty(newLineText)) {
+            state.lines[lineIdx] = {
+                groups: [],
+                isEmpty: line.draft ? false : true,
+                draft: !!line.draft,
+                collapsed: line.collapsed,
+                audioData: line.audioData || null
+            };
+        } else {
+            const existingGroups = line.isEmpty ? [] : line.groups;
+            const newGroups = computeGroupsForLineText(newLineText, existingGroups);
+            state.lines[lineIdx] = {
+                groups: newGroups,
+                isEmpty: false,
+                draft: !!line.draft,
+                collapsed: line.collapsed,
+                audioData: line.audioData || null
+            };
+        }
+
+        updateTextareaFromState();
+        updateLineGroupsDOM(lineIdx);
+    }
+
+    // Refresh only the visual parts of one line block. This avoids destroying
+    // and recreating the text input on every keystroke.
+    function updateLineGroupsDOM(lineIdx) {
+        const line = state.lines[lineIdx];
+        if (!line) return;
+
+        const lineBlock = groupsContainer.querySelector(`.line-block[data-line=\"${lineIdx}\"]`);
+        if (!lineBlock) {
+            renderGroups();
+            return;
+        }
+
+        const lineText = line.isEmpty ? '' : line.groups.flatMap(g => g.words).join(' ');
+        const preview = lineBlock.querySelector('.line-preview');
+        if (preview) preview.textContent = lineText;
+
+        const body = lineBlock.querySelector('.line-block-body');
+        if (!body) return;
+
+        let chips = body.querySelector('.chips');
+
+        if (!line.groups.length) {
+            if (chips) chips.remove();
+            return;
+        }
+
+        if (!chips) {
+            chips = document.createElement('div');
+            chips.className = 'chips';
+            body.appendChild(chips);
+        }
+
+        let html = '';
+        for (let gi = 0; gi < line.groups.length; gi++) {
+            const group = line.groups[gi];
+            const displayText = group.words.join(' ');
+            const note = group.note;
+            const hasNote = note !== null;
+            const isLastInLine = gi === line.groups.length - 1;
+
+            html += `<div class=\"chip\" data-line=\"${lineIdx}\" data-group=\"${gi}\">`;
+            html += `<span class=\"text\">${escapeHtml(displayText)}</span>`;
+            const noteDisplay = hasNote ? note.replace(/\d/, '') : '♩';
+            html += `<span class=\"note-badge ${hasNote ? 'has-note' : ''}\" title=\"${hasNote ? escapeHtml(note) : 'Тап на слово, щоб вибрати ноту'}\">${noteDisplay}</span>`;
+
+            if (!isLastInLine) {
+                html += `<button class=\"action-btn merge-btn\" data-action=\"merge\" data-line=\"${lineIdx}\" data-group=\"${gi}\" title=\"Об'єднати з наступною групою\">+</button>`;
+            }
+            if (group.words.length > 1) {
+                html += `<button class=\"action-btn split-btn\" data-action=\"split\" data-line=\"${lineIdx}\" data-group=\"${gi}\" title=\"Відокремити останнє слово\">✂️</button>`;
+            }
+            html += `</div>`;
+        }
+        chips.innerHTML = html;
+
+        chips.querySelectorAll('.chip').forEach(chip => {
+            chip.addEventListener('click', (e) => {
+                if (e.target.closest('.action-btn')) return;
+                openNotePopup(parseInt(chip.dataset.line), parseInt(chip.dataset.group));
+            });
+        });
+        chips.querySelectorAll('[data-action=\"merge\"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                mergeGroupWithNext(parseInt(btn.dataset.line), parseInt(btn.dataset.group));
+            });
+        });
+        chips.querySelectorAll('[data-action=\"split\"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                splitGroup(parseInt(btn.dataset.line), parseInt(btn.dataset.group));
+            });
+        });
+
+        groupCount.textContent = `${state.lines.reduce((sum, currentLine) => sum + (currentLine.isEmpty ? 0 : currentLine.groups.length), 0)} груп`;
+    }
+
+    // Applies an edit made directly in a single line block's own text field:
+    // recomputes that line's groups (preserving matching notes) without
+    // touching any other line.
+    function handleLineTextCommit(lineIdx, newLineText) {
+        const line = state.lines[lineIdx];
+        if (!line) return;
+
+        const currentLineText = line.isEmpty ? '' : line.groups.flatMap(g => g.words).join(' ');
+        if (newLineText.trim() === currentLineText.trim()) return;
+
+        if (isLineEmpty(newLineText)) {
+            state.lines[lineIdx] = { groups: [], isEmpty: true, collapsed: line.collapsed };
+        } else {
+            const existingGroups = line.isEmpty ? [] : line.groups;
+            const newGroups = computeGroupsForLineText(newLineText, existingGroups);
+            state.lines[lineIdx] = { groups: newGroups, isEmpty: false, collapsed: line.collapsed };
+        }
+
+        updateTextareaFromState();
+        renderAll();
+    }
+
+    function toggleLineCollapsed(lineIdx) {
+        const line = state.lines[lineIdx];
+        if (!line) return;
+        line.collapsed = !line.collapsed;
+        renderAll();
+    }
+
+
+    // ============================================================
+    // 6.5 LINE CREATION + MICROPHONE ANALYSIS
+    // ============================================================
+    function addEmptyLine() {
+        // A draft line is a real editable block, not a visual blank separator.
+        state.lines.push({ groups: [], isEmpty: false, draft: true, collapsed: false, audioData: null });
+        updateTextareaFromState();
+        renderAll();
+        requestAnimationFrame(() => {
+            const input = groupsContainer.querySelector(`.line-text-input[data-line="${state.lines.length - 1}"]`);
+            if (input) input.focus();
+        });
+    }
+
+    function arrayBufferToBase64(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        const chunk = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+        return btoa(binary);
+    }
+
+    function frequencyToNearestNote(freq) {
+        if (!freq || !isFinite(freq)) return null;
+        let best = null, bestDiff = Infinity;
+        for (const note of state.notes) {
+            const f = noteFreq[note];
+            const diff = Math.abs(12 * Math.log2(freq / f));
+            if (diff < bestDiff) { bestDiff = diff; best = note; }
+        }
+        return bestDiff <= 1.2 ? best : null;
+    }
+
+    function detectPitchAutocorrelation(buffer, sampleRate, start, size) {
+        let rms = 0;
+        for (let i = 0; i < size; i++) rms += buffer[start + i] * buffer[start + i];
+        rms = Math.sqrt(rms / size);
+        if (rms < 0.012) return null;
+        const minLag = Math.max(1, Math.floor(sampleRate / 1100));
+        const maxLag = Math.min(Math.floor(sampleRate / 70), size - 2);
+        let bestLag = -1, best = 0;
+        for (let lag = minLag; lag <= maxLag; lag++) {
+            let corr = 0;
+            for (let i = 0; i < size - lag; i++) corr += buffer[start + i] * buffer[start + i + lag];
+            if (corr > best) { best = corr; bestLag = lag; }
+        }
+        if (bestLag < 0) return null;
+        const freq = sampleRate / bestLag;
+        return frequencyToNearestNote(freq);
+    }
+
+    async function analyzeRecordedPitch(blob) {
+        const ctx = getAudioCtx();
+        const audioBuffer = await ctx.decodeAudioData(await blob.arrayBuffer());
+        const data = audioBuffer.getChannelData(0);
+        const sampleRate = audioBuffer.sampleRate;
+        const frame = 4096;
+        const hop = 1024;
+        const raw = [];
+        for (let start = 0; start + frame <= data.length; start += hop) {
+            const note = detectPitchAutocorrelation(data, sampleRate, start, frame);
+            raw.push({ note, start: start / sampleRate, end: (start + hop) / sampleRate });
+        }
+        const segments = [];
+        for (const item of raw) {
+            if (!item.note) continue;
+            const last = segments[segments.length - 1];
+            if (last && last.note === item.note && item.start - last.end < 0.12) last.end = item.end;
+            else segments.push({ note: item.note, start: item.start, end: item.end });
+        }
+        // Ignore very short pitch glitches and merge tiny gaps.
+        return segments.filter(s => s.end - s.start >= 0.10).map(s => ({ note: s.note, duration: Math.max(0.1, s.end - s.start) }));
+    }
+
+    function syllabifyUkrainianWord(word) {
+        const clean = word.replace(/[^\u0400-\u04FF'’ʼ-]/g, '');
+        if (!clean) return [];
+        const vowels = 'аеєиіїоуюяАЕЄИІЇОУЮЯ';
+        const out = [];
+        let start = 0;
+        for (let i = 0; i < clean.length; i++) {
+            if (vowels.includes(clean[i]) && i > start) {
+                let nextVowel = -1;
+                for (let j = i + 1; j < clean.length; j++) if (vowels.includes(clean[j])) { nextVowel = j; break; }
+                if (nextVowel >= 0) {
+                    let cut = i + 1;
+                    const consonants = nextVowel - (i + 1);
+                    if (consonants > 1) cut = nextVowel - 1;
+                    out.push(clean.slice(start, cut));
+                    start = cut;
+                    i = cut - 1;
+                }
+            }
+        }
+        if (start < clean.length) out.push(clean.slice(start));
+        return out.length ? out : [clean];
+    }
+
+    function syllablesFromTranscript(transcript) {
+        const words = transcript.trim().split(/\s+/).filter(Boolean);
+        const result = [];
+        for (const word of words) {
+            const parts = syllabifyUkrainianWord(word);
+            if (!parts.length) continue;
+            // Punctuation stays with the final syllable of a word.
+            const punctuation = word.match(/[.,!?;:()\-–—«»"']+$/)?.[0] || '';
+            parts.forEach((p, i) => result.push(i === parts.length - 1 ? p + punctuation : p));
+        }
+        return result;
+    }
+
+    function alignSyllablesToNotes(syllables, detectedNotes) {
+        if (!detectedNotes.length) return [];
+        if (!syllables.length) return detectedNotes.map(n => ({ words: ['♪'], note: n.note, duration: n.duration }));
+        const result = [];
+        const noteCount = detectedNotes.length;
+        // Proportional alignment: long notes receive proportionally more text.
+        const totalDuration = detectedNotes.reduce((s, n) => s + n.duration, 0);
+        let si = 0;
+        let assigned = 0;
+        for (let i = 0; i < noteCount; i++) {
+            const remainingNotes = noteCount - i;
+            const remainingSyllables = syllables.length - si;
+            let take = 1;
+            if (remainingSyllables > remainingNotes) {
+                const target = detectedNotes[i].duration / Math.max(0.01, totalDuration);
+                take = Math.max(1, Math.round(remainingSyllables * target));
+                take = Math.min(take, remainingSyllables - (remainingNotes - 1));
+            }
+            const chunk = syllables.slice(si, si + take);
+            if (!chunk.length) break;
+            result.push({ words: chunk, note: detectedNotes[i].note, duration: detectedNotes[i].duration });
+            si += take;
+            assigned += take;
+        }
+        // If there are leftover syllables, append them to the final note: they remain one group.
+        if (si < syllables.length && result.length) result[result.length - 1].words.push(...syllables.slice(si));
+        return result;
+    }
+
+    let recognition = null;
+    let recognitionTranscript = '';
+    function startSpeechRecognition() {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) return null;
+        recognitionTranscript = '';
+        recognition = new SpeechRecognition();
+        recognition.lang = 'uk-UA';
+        recognition.continuous = true;
+        recognition.interimResults = false;
+        recognition.onresult = e => {
+            for (let i = e.resultIndex; i < e.results.length; i++) {
+                if (e.results[i].isFinal) recognitionTranscript += ' ' + e.results[i][0].transcript;
+            }
+        };
+        recognition.onerror = () => {};
+        try { recognition.start(); } catch (e) {}
+        return recognition;
+    }
+    function stopSpeechRecognition() {
+        if (recognition) { try { recognition.stop(); } catch (e) {} }
+        const text = recognitionTranscript.trim();
+        recognition = null;
+        return text;
+    }
+
+    async function finishLineRecording(lineIdx, chunks, mimeType) {
+        const blob = new Blob(chunks, { type: mimeType });
+        const audioData = { type: mimeType, base64: arrayBufferToBase64(await blob.arrayBuffer()) };
+        const status = groupsContainer.querySelector(`[data-record-status="${lineIdx}"]`);
+        if (status) { status.textContent = 'Аналіз ноти та тексту…'; status.classList.add('processing'); }
+        try {
+            const detectedNotes = await analyzeRecordedPitch(blob);
+            const transcript = stopSpeechRecognition();
+            const syllables = syllablesFromTranscript(transcript);
+            const groups = alignSyllablesToNotes(syllables, detectedNotes);
+            const line = state.lines[lineIdx];
+            if (!line) return;
+            line.audioData = audioData;
+            if (groups.length) {
+                line.groups = groups;
+                line.isEmpty = false;
+                line.draft = false;
+                updateTextareaFromState();
+            } else if (transcript) {
+                line.groups = mergePunctuation(wordsFromLine(transcript)).map(w => ({ words:[w], note:null, duration:0.6 }));
+                line.isEmpty = false;
+                line.draft = false;
+                updateTextareaFromState();
+            }
+            renderAll();
+        } catch (e) {
+            console.error('Audio analysis error:', e);
+            const line = state.lines[lineIdx];
+            if (line) line.audioData = audioData;
+            renderAll();
+            alert('Запис збережено, але автоматично визначити ноти не вдалося. Спробуйте ще раз у тихішому місці.');
+        }
+    }
+
+    async function toggleLineRecording(lineIdx) {
+        if (state.recording) {
+            if (state.recording.lineIdx === lineIdx) {
+                state.recording.recorder.stop();
+            } else {
+                alert('Спочатку зупиніть поточний запис.');
+            }
+            return;
+        }
+        if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+            alert('Цей браузер не підтримує запис з мікрофона. Спробуйте Chrome або Safari.');
+            return;
+        }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+            const preferred = ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4'].find(t => MediaRecorder.isTypeSupported(t));
+            const recorder = new MediaRecorder(stream, preferred ? { mimeType: preferred } : undefined);
+            const chunks = [];
+            state.recording = { lineIdx, recorder, stream };
+            const status = groupsContainer.querySelector(`[data-record-status="${lineIdx}"]`);
+            const btn = groupsContainer.querySelector(`.record-line-btn[data-line="${lineIdx}"]`);
+            if (status) { status.textContent = 'Запис…'; status.classList.add('recording'); }
+            if (btn) { btn.textContent = '⏹ Зупинити запис'; btn.classList.add('btn-danger'); }
+            recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+            recorder.onstop = async () => {
+                stream.getTracks().forEach(t => t.stop());
+                state.recording = null;
+                await finishLineRecording(lineIdx, chunks, recorder.mimeType || 'audio/webm');
+            };
+            recorder.start(200);
+            startSpeechRecognition();
+        } catch (e) {
+            console.error(e);
+            alert('Не вдалося отримати доступ до мікрофона. Дозвольте використання мікрофона для цієї сторінки.');
+        }
+    }
+
+    // ============================================================
+    // 7. STATE OPERATIONS
+    // ============================================================
+    function getGroup(lineIdx, groupIdx) {
+        const line = state.lines[lineIdx];
+        if (!line || line.isEmpty) return null;
+        return line.groups[groupIdx] || null;
+    }
+
+    function setGroupNote(lineIdx, groupIdx, note) {
+        const g = getGroup(lineIdx, groupIdx);
+        if (g) {
+            g.note = note;
+            if (note && !g.duration) g.duration = 0.6;
+            if (note) {
+                playNoteOnce(note);
+            }
+        }
+        renderAll();
+    }
+
+    function mergeGroupWithNext(lineIdx, groupIdx) {
+        const line = state.lines[lineIdx];
+        if (!line || line.isEmpty) return;
+        const groups = line.groups;
+        if (groupIdx < 0 || groupIdx >= groups.length - 1) return;
+
+        const current = groups[groupIdx];
+        const next = groups[groupIdx + 1];
+        if (!current || !next) return;
+
+        const mergedWords = [...current.words, ...next.words];
+        const note = current.note !== null ? current.note : next.note;
+
+        groups.splice(groupIdx, 2, {
+            words: mergedWords,
+            note: note,
+            duration: (current.duration || 0.6) + (next.duration || 0.6)
+        });
+
+        updateTextareaFromState();
+        renderAll();
+    }
+
+    function splitGroup(lineIdx, groupIdx) {
+        const line = state.lines[lineIdx];
+        if (!line || line.isEmpty) return;
+        const group = line.groups[groupIdx];
+        if (!group) return;
+        if (group.words.length <= 1) return;
+
+        const words = group.words;
+        const lastWord = words[words.length - 1];
+        const restWords = words.slice(0, words.length - 1);
+        const note = group.note;
+
+        line.groups.splice(groupIdx, 1, {
+            words: restWords,
+            note: note,
+            duration: group.duration || 0.6
+        }, {
+            words: [lastWord],
+            note: null,
+            duration: 0.6
+        });
+
+        updateTextareaFromState();
+        renderAll();
+    }
+
+    function clearAllGroups() {
+        if (!confirm('Ви впевнені, що хочете очистити всі групи та ноти?')) return;
+        const text = lyricsInput.value;
+        const lines = parseTextToLines(text);
+        state.lines = lines.map(line => {
+            if (isLineEmpty(line)) {
+                return { groups: [], isEmpty: true, collapsed: false };
+            }
+            return {
+                groups: mergePunctuation(wordsFromLine(line)).map(w => ({
+                    words: [w],
+                    note: null
+                })),
+                isEmpty: false,
+                collapsed: false
+            };
+        });
+        renderAll();
+    }
+
+    function updateTextareaFromState() {
+        const lines = state.lines.map(line => {
+            if (line.isEmpty) return '';
+            return line.groups.flatMap(g => g.words).join(' ');
+        });
+        lyricsInput.value = lines.join('\n');
+    }
+
+    // ============================================================
+    // 8. RENDER
+    // ============================================================
+    function getGroupId(lineIdx, groupIdx) {
+        return `g-${lineIdx}-${groupIdx}`;
+    }
+
+    function renderGroups() {
+        const container = groupsContainer;
+        if (!state.lines.length || state.lines.every(l => l.isEmpty && !l.draft)) {
+            container.innerHTML = `<div class="empty-state"><span class="big-icon">📝</span>Вставте текст в поле для тексту пісні, щоб створити групи слів</div>`;
+            groupCount.textContent = '0 груп';
+            return;
+        }
+
+        let totalGroups = 0;
+        let html = '';
+        for (let li = 0; li < state.lines.length; li++) {
+            const line = state.lines[li];
+
+            if (line.isEmpty) {
+                html += `<div class="line-block-empty"></div>`;
+                continue;
+            }
+
+            totalGroups += line.groups.length;
+            const lineText = line.groups.flatMap(g => g.words).join(' ');
+            const collapsedClass = line.collapsed ? ' collapsed' : '';
+
+            const draftClass = line.draft ? ' draft' : '';
+            html += `<div class="line-block${collapsedClass}${draftClass}" data-line="${li}">`;
+
+            html += `<div class="line-block-header" data-line="${li}">`;
+            html += `<button class="collapse-toggle" type="button" tabindex="-1" title="Згорнути/розгорнути рядок">▾</button>`;
+            html += `<span class="line-number">${li + 1}</span>`;
+            html += `<span class="line-preview">${escapeHtml(lineText)}</span>`;
+            html += `</div>`;
+
+            html += `<div class="line-block-body">`;
+            html += `<input type="text" class="line-text-input" data-line="${li}" placeholder="Текст рядка">`;
+            html += `<div class="record-actions">`;
+            html += `<button class="btn btn-secondary btn-sm record-line-btn" data-line="${li}" type="button">🎙 Додати аудіо</button>`;
+            if (line.audioData) html += `<span class="line-audio-badge">● Аудіо проаналізовано</span>`;
+            html += `<span class="record-status" data-record-status="${li}"></span>`;
+            html += `</div>`;
+
+            if (line.groups.length) {
+                html += `<div class="chips">`;
+                for (let gi = 0; gi < line.groups.length; gi++) {
+                    const group = line.groups[gi];
+                    const words = group.words;
+                    const note = group.note;
+                    const displayText = words.join(' ');
+                    const hasNote = note !== null;
+                    const isLastInLine = gi === line.groups.length - 1;
+
+                    html += `<div class="chip" data-line="${li}" data-group="${gi}">`;
+                    html += `<span class="text">${escapeHtml(displayText)}</span>`;
+
+                    const noteDisplay = hasNote ? note.replace(/\d/, '') : '♩';
+                    html += `<span class="note-badge ${hasNote ? 'has-note' : ''}" title="${hasNote ? note : 'Тап на слово, щоб вибрати ноту'}">${noteDisplay}</span>`;
+
+                    if (!isLastInLine) {
+                        html += `<button class="action-btn merge-btn" data-action="merge" data-line="${li}" data-group="${gi}" title="Об'єднати з наступною групою">+</button>`;
+                    }
+
+                    if (group.words.length > 1) {
+                        html += `<button class="action-btn split-btn" data-action="split" data-line="${li}" data-group="${gi}" title="Відокремити останнє слово">✂️</button>`;
+                    }
+
+                    html += `</div>`;
+                }
+                html += `</div>`;
+            }
+
+            html += `</div></div>`;
+        }
+
+        container.innerHTML = html;
+        groupCount.textContent = `${totalGroups} груп`;
+
+        // Values are assigned via JS (not baked into the HTML string) so line
+        // text containing quotes/special characters can never break the markup.
+        container.querySelectorAll('.line-text-input').forEach(input => {
+            const li = parseInt(input.dataset.line);
+            const line = state.lines[li];
+            input.value = (line && !line.isEmpty) ? line.groups.flatMap(g => g.words).join(' ') : '';
+
+            // Update groups immediately while typing. Only the groups/preview
+            // DOM is refreshed, so this input keeps focus and its caret position.
+            input.addEventListener('input', () => {
+                let newText = removeLatin(input.value);
+
+                if (input.value !== newText) {
+                    const start = input.selectionStart;
+                    const cleanedPrefix = cleanLyricsText(input.value.slice(0, start));
+                    const newCursorPosition = cleanedPrefix.length;
+
+                    input.value = newText;
+                    input.setSelectionRange(newCursorPosition, newCursorPosition);
+                }
+
+                handleLineTextLiveEdit(li, input.value);
+            });
+
+            input.addEventListener('blur', () => {
+                handleLineTextCommit(li, input.value);
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    input.blur();
+                }
+            });
+            input.addEventListener('click', (e) => e.stopPropagation());
+        });
+
+        container.querySelectorAll('.line-block-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const li = parseInt(header.dataset.line);
+                toggleLineCollapsed(li);
+            });
+        });
+
+        container.querySelectorAll('.chip').forEach(chip => {
+            chip.addEventListener('click', (e) => {
+                if (e.target.closest('.action-btn')) return;
+                const line = parseInt(chip.dataset.line);
+                const group = parseInt(chip.dataset.group);
+                openNotePopup(line, group);
+            });
+        });
+
+        container.querySelectorAll('[data-action="merge"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const line = parseInt(btn.dataset.line);
+                const group = parseInt(btn.dataset.group);
+                mergeGroupWithNext(line, group);
+            });
+        });
+
+        container.querySelectorAll('[data-action="split"]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const line = parseInt(btn.dataset.line);
+                const group = parseInt(btn.dataset.group);
+                splitGroup(line, group);
+            });
+        });
+    }
+
+
+    // ============================================================
+    // 8.5 LINE PLAYER
+    // ============================================================
+    function lineDuration(lineIdx) {
+        const line = state.lines[lineIdx];
+        return line ? line.groups.reduce((s,g) => s + (g.duration || 0.6), 0) : 0;
+    }
+    function stopLinePlayback(collapse = true) {
+        const pp = state.playerPlayback;
+        if (pp.timer) clearTimeout(pp.timer);
+        if (pp.raf) cancelAnimationFrame(pp.raf);
+        pp.timer = null; pp.raf = null;
+        stopAllContinuous();
+        if (collapse && pp.expanded !== null) pp.expanded = null;
+        pp.playing = false; pp.lineIdx = null; pp.elapsed = 0;
+        document.querySelectorAll('.player-chip.playing-group').forEach(el => el.classList.remove('playing-group'));
+        document.querySelectorAll('.player-line.playing-line').forEach(el => el.classList.remove('playing-line'));
+    }
+    function setPlayerProgress(lineIdx, elapsed) {
+        const line = state.lines[lineIdx]; if (!line) return;
+        const total = lineDuration(lineIdx);
+        const clamped = Math.max(0, Math.min(total, elapsed));
+        state.playerPlayback.elapsed = clamped;
+        const root = playerContainer.querySelector(`.player-line[data-line="${lineIdx}"]`);
+        if (!root) return;
+        const pct = total ? clamped / total * 100 : 0;
+        const progress = root.querySelector('.player-track-progress');
+        const dot = root.querySelector('.player-track-dot');
+        const current = root.querySelector('.player-current-time');
+        if (progress) progress.style.width = pct + '%';
+        if (dot) dot.style.left = pct + '%';
+        if (current) current.textContent = formatTime(clamped);
+        let pos = 0;
+        root.querySelectorAll('.player-chip').forEach((chip, gi) => {
+            const d = line.groups[gi].duration || 0.6;
+            const active = clamped >= pos && clamped < pos + d && clamped < total;
+            chip.classList.toggle('playing-group', active);
+            pos += d;
+        });
+    }
+    function formatTime(sec) { sec = Math.max(0, sec || 0); return `${Math.floor(sec/60)}:${String(Math.floor(sec%60)).padStart(2,'0')}`; }
+    function playLineFrom(lineIdx, startAt = 0) {
+        const line = state.lines[lineIdx]; if (!line || !line.groups.length) return;
+        stopLinePlayback(false);
+        state.playerPlayback.lineIdx = lineIdx;
+        state.playerPlayback.expanded = lineIdx;
+        state.playerPlayback.playing = true;
+        state.playerPlayback.elapsed = Math.min(startAt, lineDuration(lineIdx));
+        const speed = state.playerPlayback.speed || 1;
+        let elapsed = state.playerPlayback.elapsed;
+        let pos = 0;
+        for (const g of line.groups) {
+            const d = g.duration || 0.6;
+            if (elapsed >= pos + d) { pos += d; continue; }
+            const remaining = pos + d - elapsed;
+            if (g.note) playNote(g.note, Math.max(0.08, remaining / speed));
+            const delay = remaining * 1000 / speed;
+            state.playerPlayback.timer = setTimeout(() => playNextGroup(lineIdx, line.groups.indexOf(g) + 1), delay);
+            break;
+        }
+        renderPlayer();
+        requestAnimationFrame(playerAnimationFrame);
+    }
+    function playNextGroup(lineIdx, groupIdx) {
+        if (!state.playerPlayback.playing || state.playerPlayback.lineIdx !== lineIdx) return;
+        const line = state.lines[lineIdx];
+        if (!line || groupIdx >= line.groups.length) { stopLinePlayback(false); setPlayerProgress(lineIdx, lineDuration(lineIdx)); renderPlayer(); return; }
+        const before = line.groups.slice(0, groupIdx).reduce((s,g)=>s+(g.duration||0.6),0);
+        state.playerPlayback.elapsed = before;
+        const g = line.groups[groupIdx];
+        const d = g.duration || 0.6;
+        if (g.note) playNote(g.note, d / (state.playerPlayback.speed || 1));
+        state.playerPlayback.timer = setTimeout(() => playNextGroup(lineIdx, groupIdx + 1), d * 1000 / (state.playerPlayback.speed || 1));
+    }
+    function playerAnimationFrame() {
+        const pp = state.playerPlayback;
+        if (!pp.playing || pp.lineIdx === null) return;
+        const elapsed = pp.elapsed + (performance.now() - pp.startedAt) / 1000 * (pp.speed || 1);
+        setPlayerProgress(pp.lineIdx, elapsed);
+        if (elapsed >= lineDuration(pp.lineIdx)) { pp.playing = false; setPlayerProgress(pp.lineIdx, lineDuration(pp.lineIdx)); renderPlayer(); return; }
+        pp.raf = requestAnimationFrame(playerAnimationFrame);
+    }
+    function togglePlayerLine(lineIdx) {
+        if (state.playerPlayback.expanded === lineIdx) { stopLinePlayback(true); renderPlayer(); return; }
+        stopLinePlayback(true);
+        state.playerPlayback.speed = 1;
+        playLineFrom(lineIdx, 0);
+    }
+    function seekLinePlayer(lineIdx, ratio) {
+        const total = lineDuration(lineIdx); const at = Math.max(0, Math.min(1, ratio)) * total;
+        if (state.playerPlayback.lineIdx === lineIdx && state.playerPlayback.playing) playLineFrom(lineIdx, at);
+        else { state.playerPlayback.lineIdx = lineIdx; state.playerPlayback.expanded = lineIdx; state.playerPlayback.elapsed = at; renderPlayer(); setPlayerProgress(lineIdx, at); }
+    }
+    function switchPlayerLine(delta) {
+        const current = state.playerPlayback.expanded ?? 0;
+        const candidates = state.lines.map((l,i)=>({l,i})).filter(x=>!x.l.isEmpty && x.l.groups.length);
+        const idx = candidates.findIndex(x=>x.i === current);
+        const next = candidates[Math.max(0, Math.min(candidates.length-1, idx + delta))];
+        if (!next) return;
+        const targetEl = playerContainer.querySelector(`.player-line[data-line="${next.i}"]`);
+        targetEl?.scrollIntoView({ behavior:'smooth', block:'center' });
+        playLineFrom(next.i, 0);
+    }
+
+    function renderPlayer() {
+        const container = playerContainer;
+        if (!state.lines.length || state.lines.every(l => l.isEmpty || l.groups.length === 0)) {
+            container.innerHTML = `<div class="empty-state"><span class="big-icon">🎤</span>Немає груп для тренування. Спочатку створіть групи в редакторі.</div>`;
+            playerGroupCount.textContent = '0 груп';
+            return;
+        }
+        let totalGroups = 0;
+        let html = '';
+        for (let li = 0; li < state.lines.length; li++) {
+            const line = state.lines[li];
+            if (line.isEmpty) { html += `<div class="player-line empty-line"></div>`; continue; }
+            if (!line.groups.length) continue;
+            totalGroups += line.groups.length;
+            const expanded = state.playerPlayback.expanded === li;
+            html += `<div class="player-line${state.playerPlayback.lineIdx===li && state.playerPlayback.playing?' playing-line':''}" data-line="${li}">`;
+            html += `<div class="player-line-head">`;
+            html += `<button class="player-line-play${expanded?' expanded':''}" data-line-play="${li}" title="Програти рядок">▶</button>`;
+            html += `<span class="player-line-label">${li + 1}</span>`;
+            html += `<div class="player-chips">`;
+            for (let gi = 0; gi < line.groups.length; gi++) {
+                const group = line.groups[gi];
+                const note = group.note;
+                const displayText = group.words.join(' ');
+                const groupId = getGroupId(li, gi);
+                const hasNote = note !== null;
+                const noteDisplay = hasNote ? note.replace(/\d/, '') : '—';
+                html += `<div class="player-chip" data-group-id="${groupId}" data-line="${li}" data-group="${gi}" data-note="${note || ''}">${escapeHtml(displayText)}`;
+                if (hasNote) html += `<span class="note-label">${noteDisplay}</span>`;
+                html += `</div>`;
+            }
+            html += `</div></div>`;
+            if (expanded) {
+                const total = lineDuration(li);
+                const elapsed = state.playerPlayback.lineIdx===li ? state.playerPlayback.elapsed : 0;
+                const pct = total ? elapsed/total*100 : 0;
+                html += `<div class="player-line-player" data-player="${li}">`;
+                html += `<div class="player-track" data-seek-line="${li}"><div class="player-track-progress" style="width:${pct}%"></div><div class="player-track-dot" style="left:${pct}%"></div></div>`;
+                html += `<div class="player-time"><span class="player-current-time">${formatTime(elapsed)}</span><span>${formatTime(total)}</span></div>`;
+                html += `<div class="player-tools">`;
+                html += `<button class="player-mini-btn" data-prev-line="${li}" title="Попередній рядок">⏮</button>`;
+                html += `<button class="player-mini-btn" data-restart-line="${li}" title="Спочатку">↺</button>`;
+                html += `<button class="player-mini-btn" data-next-line="${li}" title="Наступний рядок">⏭</button>`;
+                html += `<div class="player-speed">Швидкість <input type="range" min="0.333" max="1" step="0.001" value="${state.playerPlayback.speed||1}" data-speed-line="${li}"><span>${(state.playerPlayback.speed||1).toFixed(2)}×</span></div>`;
+                html += `</div></div>`;
+            }
+            html += `</div>`;
+        }
+        container.innerHTML = html;
+        playerGroupCount.textContent = `${totalGroups} груп`;
+        container.querySelectorAll('.player-line-play').forEach(btn => btn.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); togglePlayerLine(parseInt(btn.dataset.line)); }));
+        container.querySelectorAll('[data-prev-line]').forEach(btn => btn.addEventListener('click', ()=>switchPlayerLine(-1)));
+        container.querySelectorAll('[data-next-line]').forEach(btn => btn.addEventListener('click', ()=>switchPlayerLine(1)));
+        container.querySelectorAll('[data-restart-line]').forEach(btn => btn.addEventListener('click', ()=>playLineFrom(parseInt(btn.dataset.restartLine),0)));
+        container.querySelectorAll('[data-speed-line]').forEach(input => input.addEventListener('input', ()=>{
+            const v=parseFloat(input.value); state.playerPlayback.speed=v; input.nextElementSibling.textContent=v.toFixed(2)+'×';
+        }));
+        container.querySelectorAll('[data-seek-line]').forEach(track => {
+            const seek = e => { const r=track.getBoundingClientRect(); seekLinePlayer(parseInt(track.dataset.seekLine),(e.clientX-r.left)/r.width); };
+            track.addEventListener('pointerdown', e=>{ track.setPointerCapture?.(e.pointerId); seek(e); });
+            track.addEventListener('pointermove', e=>{ if(e.buttons) seek(e); });
+        });
+        container.querySelectorAll('.player-chip').forEach(chip => {
+            const note = chip.dataset.note, groupId = chip.dataset.groupId;
+            if (!note) { chip.style.opacity='0.5'; chip.style.cursor='not-allowed'; chip.title='Немає ноти'; return; }
+            const startHold=e=>{ e.preventDefault(); if(state.holdingId===groupId)return; stopAllContinuous(); state.holdingId=groupId; chip.classList.add('holding'); startContinuousNote(note,groupId); };
+            const endHold=e=>{ e.preventDefault(); if(state.holdingId===groupId){ stopContinuousNote(groupId); chip.classList.remove('holding'); state.holdingId=null; } };
+            chip.addEventListener('mousedown',startHold); chip.addEventListener('mouseup',endHold); chip.addEventListener('mouseleave',endHold);
+            chip.addEventListener('touchstart',startHold,{passive:false}); chip.addEventListener('touchend',endHold,{passive:false}); chip.addEventListener('touchcancel',endHold,{passive:false});
+        });
+        if (state.playerPlayback.lineIdx !== null && state.playerPlayback.expanded !== null) setPlayerProgress(state.playerPlayback.lineIdx, state.playerPlayback.elapsed);
+    }
+
+    function renderAll() {
+        if (state.currentTab === 'editor') {
+            renderGroups();
+        } else {
+            renderPlayer();
+        }
+    }
+
+    // ============================================================
+    // 9. NOTE POPUP
+    // ============================================================
+    let popupLineIdx = null;
+    let popupGroupIdx = null;
+
+    function openNotePopup(lineIdx, groupIdx) {
+        const group = getGroup(lineIdx, groupIdx);
+        if (!group) return;
+
+        popupLineIdx = lineIdx;
+        popupGroupIdx = groupIdx;
+
+        const currentNote = group.note;
+        state.tempNote = currentNote || null;
+
+        noteGrid.innerHTML = '';
+
+        const octaveGroups = [
+            { label: 'Мала октава', notes: state.notes.filter(n => n.endsWith('3')) },
+            { label: 'Перша октава', notes: state.notes.filter(n => n.endsWith('4')) },
+            { label: 'Друга октава', notes: state.notes.filter(n => n.endsWith('5')) }
+        ];
+
+        octaveGroups.forEach(group => {
+            const labelEl = document.createElement('div');
+            labelEl.className = 'octave-label';
+            labelEl.textContent = group.label;
+            noteGrid.appendChild(labelEl);
+
+            const rowEl = document.createElement('div');
+            rowEl.className = 'octave-row';
+
+            group.notes.forEach(n => {
+                const btn = document.createElement('button');
+                btn.className = 'note-btn';
+                if (n === currentNote) btn.classList.add('selected');
+                btn.textContent = n.replace(/\d/, '');
+                btn.title = n;
+                btn.dataset.note = n;
+                btn.addEventListener('click', () => {
+                    state.tempNote = n;
+                    saveNoteAndClose();
+                });
+                rowEl.appendChild(btn);
+            });
+
+            noteGrid.appendChild(rowEl);
+        });
+
+        notePopup.classList.add('open');
+    }
+
+    function closeNotePopup() {
+        notePopup.classList.remove('open');
+        popupLineIdx = null;
+        popupGroupIdx = null;
+        state.tempNote = null;
+    }
+
+    function saveNoteAndClose() {
+        if (popupLineIdx === null || popupGroupIdx === null) return;
+        const note = state.tempNote;
+        setGroupNote(popupLineIdx, popupGroupIdx, note);
+        closeNotePopup();
+    }
+
+    function removeNoteAndClose() {
+        if (popupLineIdx === null || popupGroupIdx === null) return;
+        state.tempNote = null;
+        setGroupNote(popupLineIdx, popupGroupIdx, null);
+        closeNotePopup();
+    }
+
+    // ============================================================
+    // 10. SHARE
+    // ============================================================
+    function getShareData() {
+        const text = lyricsInput.value;
+        return {
+            t: text,
+            g: state.lines.map(line => {
+                if (line.isEmpty) return null;
+                return line.groups.map(g => ({
+                    w: g.words,
+                    n: g.note,
+                    d: g.duration || 0.6
+                }));
+            })
+        };
+    }
+
+    function loadShareData(data) {
+        lyricsInput.value = data.t;
+        state.lines = data.g.map(lineData => {
+            if (lineData === null) {
+                return { groups: [], isEmpty: true, collapsed: false };
+            }
+            return {
+                groups: lineData.map(g => ({
+                    words: g.w,
+                    note: g.n,
+                    duration: g.d || 0.6
+                })),
+                isEmpty: false,
+                collapsed: false
+            };
+        });
+        renderAll();
+    }
+
+    function generateShareUrl() {
+        const data = getShareData();
+        try {
+            const json = JSON.stringify(data);
+            const compressed = LZString.compressToEncodedURIComponent(json);
+            return window.location.href.split('#')[0] + '#z' + compressed;
+        } catch (e) {
+            console.error('Share error:', e);
+            return null;
+        }
+    }
+
+    function shareFromPlayer() {
+        const url = generateShareUrl();
+        if (!url) {
+            alert('Помилка створення посилання');
+            return;
+        }
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(() => {
+                showNotification('✅ Посилання скопійовано!');
+            }).catch(() => {
+                fallbackCopy(url);
+            });
+        } else {
+            fallbackCopy(url);
+        }
+    }
+
+    function fallbackCopy(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+            document.execCommand('copy');
+            showNotification('✅ Посилання скопійовано!');
+        } catch (e) {
+            prompt('Скопіюйте посилання вручну:', text);
+        }
+        document.body.removeChild(ta);
+    }
+
+    function showNotification(msg) {
+        shareNotif.textContent = msg;
+        shareNotif.classList.add('show');
+        clearTimeout(shareNotif._hideTimer);
+        shareNotif._hideTimer = setTimeout(() => {
+            shareNotif.classList.remove('show');
+        }, 3000);
+    }
+
+    // ============================================================
+    // 11. URL HASH LOADING
+    // ============================================================
+    function loadFromHash() {
+        const hash = window.location.hash.slice(1);
+        if (!hash) return false;
+        try {
+            let json;
+            if (hash[0] === 'z') {
+                // New compressed format
+                json = LZString.decompressFromEncodedURIComponent(hash.slice(1));
+            } else {
+                // Legacy plain base64 format (old shared links)
+                json = decodeURIComponent(atob(hash));
+            }
+            const data = JSON.parse(json);
+            if (data.t !== undefined && data.g !== undefined) {
+                loadShareData(data);
+                return true;
+            }
+        } catch (e) {
+            console.warn('Failed to load from hash:', e);
+        }
+        return false;
+    }
+
+    // ============================================================
+    // 12. UTILITY
+    // ============================================================
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // ============================================================
+    // 13. TAB SWITCHING
+    // ============================================================
+    function switchTab(tabName) {
+        state.currentTab = tabName;
+        tabBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tabName);
+        });
+        Object.keys(screens).forEach(key => {
+            screens[key].classList.toggle('active', key === tabName);
+        });
+        renderAll();
+    }
+
+    // ============================================================
+    // 13.5 VOLUME CONTROL
+    // ============================================================
+    function updateVolumeUI(percent) {
+        volValue.textContent = percent + '%';
+        const max = parseInt(volumeSlider.max, 10) || 100;
+        volIcon.textContent = percent == 0 ? '🔇' : (percent < max / 2 ? '🔉' : '🔊');
+    }
+
+    function setVolume(percent) {
+    state.volume = percent / 100;
+
+    if (state.masterGain) {
+        state.masterGain.gain.value = state.volume * 20.0;
+    }
+
+    updateVolumeUI(percent);
+    }
+
+    // ============================================================
+    // 14. INSTRUMENT SELECTOR
+    // ============================================================
+    function setInstrument(instrument) {
+        if (instrument === state.instrument && state.instrumentLoaded) return;
+        
+        state.instrument = instrument;
+        state.instrumentLoaded = false;
+        stopAllContinuous();
+        
+        // Update UI
+        document.querySelectorAll('.instrument-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.instrument === instrument);
+        });
+        
+        // Load instrument
+        loadInstrument(instrument).then(() => {
+            console.log(`✅ Інструмент "${instrument}" готовий до використання`);
+        }).catch(() => {
+            console.warn(`⚠️ Використовується синтезований звук для "${instrument}"`);
+        });
+    }
+
+    // ============================================================
+    // 15. INIT
+    // ============================================================
+    function init() {
+        const loaded = loadFromHash();
+
+        if (!loaded) {
+            lyricsInput.value = '';
+            state.lines = [];
+        }
+
+        // Restore saved volume (falls back to the 80% default already in state)
+        try {
+            const savedVolume = localStorage.getItem('vocalTrainerVolume');
+            if (savedVolume !== null) {
+                const v = parseInt(savedVolume, 10);
+                if (!isNaN(v) && v >= 0 && v <= 100) {
+                    state.volume = v / 100;
+                    volumeSlider.value = v;
+                }
+            }
+        } catch (e) {
+            console.warn('Не вдалося прочитати збережену гучність:', e);
+        }
+        updateVolumeUI(volumeSlider.value);
+
+        if (loaded) {
+            // Opened via a share link — jump straight to the exercise screen
+            switchTab('player');
+        } else {
+            renderAll();
+        }
+
+        // Auto-load default instrument
+        loadInstrument('acoustic_grand_piano').then(() => {
+            console.log('✅ Піаніно завантажено');
+        });
+
+        // ---- EVENT LISTENERS ----
+
+        volumeSlider.addEventListener('input', () => {
+            const v = parseInt(volumeSlider.value, 10);
+            setVolume(v);
+            try {
+                localStorage.setItem('vocalTrainerVolume', v);
+            } catch (e) {}
+        });
+
+        toggleNotes.addEventListener('change', () => {
+            playerContainer.classList.toggle('notes-visible', toggleNotes.checked);
+        });
+
+        lyricsInput.addEventListener('input', () => {
+            let cleanedText = removeLatin(lyricsInput.value);
+
+            // Filter Latin letters immediately, including pasted text, while
+            // preserving the caret position as much as possible.
+            if (lyricsInput.value !== cleanedText) {
+                const start = lyricsInput.selectionStart;
+                const cleanedPrefix = cleanLyricsText(lyricsInput.value.slice(0, start));
+                const newCursorPosition = cleanedPrefix.length;
+
+                lyricsInput.value = cleanedText;
+                
+                lyricsInput.setSelectionRange(newCursorPosition, newCursorPosition);
+            }
+
+            // Rebuild immediately so every edit in the main text field is
+            // reflected in the line/group blocks without the old 300 ms delay.
+            rebuildGroupsPreservingNotes(lyricsInput.value);
+            renderAll();
+        });
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                switchTab(btn.dataset.tab);
+            });
+        });
+
+        $('add-line-btn').addEventListener('click', addEmptyLine);
+        clearGroupsBtn.addEventListener('click', clearAllGroups);
+        groupsContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('.record-line-btn');
+            if (btn) { e.preventDefault(); e.stopPropagation(); toggleLineRecording(parseInt(btn.dataset.line)); }
+        });
+        backToEditorBtn.addEventListener('click', () => {
+            switchTab('editor');
+        });
+        shareFromPlayerBtn.addEventListener('click', shareFromPlayer);
+
+        popupClose.addEventListener('click', closeNotePopup);
+        popupRemoveNote.addEventListener('click', removeNoteAndClose);
+
+        notePopup.addEventListener('click', (e) => {
+            if (e.target === notePopup) closeNotePopup();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeNotePopup();
+        });
+
+        // Instrument selector
+        document.querySelectorAll('.instrument-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                setInstrument(btn.dataset.instrument);
+            });
+        });
+
+        playerContainer.addEventListener('selectstart', e => e.preventDefault());
+
+        window.addEventListener('beforeunload', () => {
+            stopAllContinuous();
+            if (state.audioCtx) {
+                state.audioCtx.close();
+            }
+        });
+
+        window.addEventListener('hashchange', () => {
+            const loadedNow = loadFromHash();
+            if (loadedNow) {
+                switchTab('player');
+            } else {
+                renderAll();
+            }
+        });
+
+        console.log('🎵 Вокальний тренер ініціалізовано');
+        console.log('📊 Груп:', state.lines.reduce((acc, l) => acc + (l.isEmpty ? 0 : l.groups.length), 0));
+        console.log('🎹 Поточний інструмент:', state.instrument);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
+})();
+</script>
+
+</body>
+</html>
