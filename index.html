@@ -247,6 +247,7 @@
             background: var(--accent);
         }
 
+        /* Notes are hidden by default in the "Вправа" screen until toggled on */
         #player-container:not(.notes-visible) .note-label {
             display: none;
         }
@@ -902,6 +903,7 @@
             filter: drop-shadow(0 0 16px rgba(52, 229, 192, 0.25));
         }
 
+        /* Player styles */
         .player-controls {
             display: flex;
             align-items: center;
@@ -1071,6 +1073,8 @@
             font-weight: 600;
         }
 
+
+        /* Player line playback */
         #player-screen { user-select: none; -webkit-user-select: none; }
         #player-screen input, #player-screen button { user-select: none; -webkit-user-select: none; }
         .player-line { border: 1px solid transparent; border-radius: 14px; padding: 8px; transition: background .2s, border-color .2s; }
@@ -1099,6 +1103,7 @@
         .line-audio-badge { font-size:11px; color:var(--accent); opacity:.9; }
         .line-block.draft .line-number { color:var(--accent); border-color:var(--accent); }
 
+        /* Loading indicator */
         .loading-spinner {
             display: inline-block;
             width: 16px;
@@ -1116,37 +1121,133 @@
         }
 
         @media (max-width: 600px) {
-            body { padding-left: 5px; padding-right: 5px; }
-            .app { padding-left: 8px; padding-right: 8px; }
-            .editor-section { margin-bottom: 8px; }
-            .groups-container { margin-top: 8px; padding-left: 10px; padding-right: 10px; }
-            .editor-actions { margin-top: 8px; }
-            .app-title { font-size: 20px; }
-            .tab-btn { padding: 6px 14px; font-size: 13px; }
-            .chip { padding: 3px 6px 3px 10px; font-size: 14px; }
-            .chip .note-badge { width: 19px; height: 19px; font-size: 8px; }
-            .chip .action-btn { width: 22px; height: 22px; font-size: 14px; }
-            .line-block-header { padding: 8px 10px; gap: 8px; }
-            .line-block-body { padding: 0 10px 10px; }
-            .line-text-input { font-size: 14px; padding: 7px 10px; }
-            .player-chip { padding: 6px 12px; font-size: 14px; }
-            .octave-row { grid-template-columns: repeat(4, 1fr); }
-            .popup { padding: 20px 16px; }
-            .note-btn { padding: 8px 0; font-size: 13px; }
-            .instrument-btn { padding: 6px 12px; font-size: 16px; }
-            .instrument-btn .label { font-size: 11px; }
+            body {
+                padding-left: 5px;
+                padding-right: 5px;
+            }
+
+            .app {
+                padding-left: 8px;
+                padding-right: 8px;
+            }
+
+            .editor-section {
+                margin-bottom: 8px;
+            }
+
+            .groups-container {
+                margin-top: 8px;
+                padding-left: 10px;
+                padding-right: 10px;
+            }
+
+            .editor-actions {
+                margin-top: 8px;
+            }
+
+            .app-title {
+                font-size: 20px;
+            }
+
+            .tab-btn {
+                padding: 6px 14px;
+                font-size: 13px;
+            }
+
+            .chip {
+                padding: 3px 6px 3px 10px;
+                font-size: 14px;
+            }
+
+            .chip .note-badge {
+                width: 19px;
+                height: 19px;
+                font-size: 8px;
+            }
+
+            .chip .action-btn {
+                width: 22px;
+                height: 22px;
+                font-size: 14px;
+            }
+
+            .line-block-header {
+                padding: 8px 10px;
+                gap: 8px;
+            }
+
+            .line-block-body {
+                padding: 0 10px 10px;
+            }
+
+            .line-text-input {
+                font-size: 14px;
+                padding: 7px 10px;
+            }
+
+            .player-chip {
+                padding: 6px 12px;
+                font-size: 14px;
+            }
+
+            .octave-row {
+                grid-template-columns: repeat(4, 1fr);
+            }
+
+            .popup {
+                padding: 20px 16px;
+            }
+
+            .note-btn {
+                padding: 8px 0;
+                font-size: 13px;
+            }
+
+            .instrument-btn {
+                padding: 6px 12px;
+                font-size: 16px;
+            }
+
+            .instrument-btn .label {
+                font-size: 11px;
+            }
         }
 
         @media (max-width: 400px) {
-            .app-header { flex-direction: column; align-items: stretch; gap: 8px; }
-            .tabs { justify-content: center; }
-            .tab-btn { flex: 1; text-align: center; padding: 6px 10px; font-size: 12px; }
-            .chip { font-size: 13px; padding: 3px 6px 3px 10px; }
-            .octave-row { grid-template-columns: repeat(3, 1fr); }
-            .player-controls { flex-direction: row; align-items: center; flex-wrap: wrap; }
-            .instrument-btn { width: auto; flex: 0 0 auto; justify-content: center; }
+            .app-header {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+            .tabs {
+                justify-content: center;
+            }
+            .tab-btn {
+                flex: 1;
+                text-align: center;
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+            .chip {
+                font-size: 13px;
+                padding: 3px 6px 3px 10px;
+            }
+            .octave-row {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            .player-controls {
+                flex-direction: row;
+                align-items: center;
+                flex-wrap: wrap;
+            }
+            .instrument-btn {
+                width: auto;
+                flex: 0 0 auto;
+                justify-content: center;
+            }
         }
     </style>
+
 </head>
 <body>
 
@@ -1258,7 +1359,7 @@
 <!-- SHARE NOTIFICATION -->
 <div class="share-notification" id="share-notification">✅ Посилання скопійовано!</div>
 
-<!-- Tone.js and lz-string libraries -->
+<!-- Tone.js library -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
 
@@ -1273,14 +1374,15 @@
         lines: [],
         editing: null,
         tempNote: null,
+        audioCtx: null,
         holdingId: null,
         debounceTimer: null,
         currentTab: 'editor',
         instrument: 'acoustic_grand_piano',
         instrumentLoaded: false,
-        sampler: null,
-        activeNotes: new Map(),
-        volume: 0.8,
+        soundfont: null,
+        activeNotes: new Map(), // For continuous playback
+        volume: 1.0,
         recording: null,
         playerPlayback: { lineIdx: null, playing: false, expanded: null, timer: null, raf: null, startedAt: 0, elapsed: 0, speed: 1 },
         notes: [
@@ -1288,11 +1390,13 @@
             'C4','C#4','D4','D#4','E4','F4','F#4','G4','G#4','A4','A#4','H4',
             'C5','C#5','D5','D#5','E5','F5','F#5','G5','G#5','A5','A#5','H5'
         ],
+        // Map European H to B for Tone.js
         noteMap: {
             'H3': 'B3', 'H4': 'B4', 'H5': 'B5'
         }
     };
 
+    // Icon + display label per instrument
     const INSTRUMENTS = {
         acoustic_grand_piano: { icon: '🎹', label: 'Піаніно' },
         violin: { icon: '🎻', label: 'Скрипка' },
@@ -1302,36 +1406,33 @@
         sine: { icon: '〰️', label: 'Синус' }
     };
 
-    const SAMPLE_MAPS = {
+    // Sample URLs for Tone.Sampler per instrument from Tonejs-instruments / soundfont-with-vis
+    const INSTRUMENT_SAMPLES = {
         acoustic_grand_piano: {
-            'C3': 'https://tonejs.github.io/audio/salamander/C3.mp3',
-            'C4': 'https://tonejs.github.io/audio/salamander/C4.mp3',
-            'C5': 'https://tonejs.github.io/audio/salamander/C5.mp3'
+            baseUrl: 'https://tonejs.github.io/audio/salamander/',
+            urls: { A0: 'A0.mp3', C1: 'C1.mp3', D#1: 'Ds1.mp3', F#1: 'Fs1.mp3', A1: 'A1.mp3', C2: 'C2.mp3', D#2: 'Ds2.mp3', F#2: 'Fs2.mp3', A2: 'A2.mp3', C3: 'C3.mp3', D#3: 'Ds3.mp3', F#3: 'Fs3.mp3', A3: 'A3.mp3', C4: 'C4.mp3', D#4: 'Ds4.mp3', F#4: 'Fs4.mp3', A4: 'A4.mp3', C5: 'C5.mp3', D#5: 'Ds5.mp3', F#5: 'Fs5.mp3', A5: 'A5.mp3', C6: 'C6.mp3' }
         },
         violin: {
-            'C3': 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/violin-mp3/C3.mp3',
-            'C4': 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/violin-mp3/C4.mp3',
-            'C5': 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/violin-mp3/C5.mp3'
+            baseUrl: 'https://tonejs.github.io/audio/m звуки/violin/', // Fallback to gleitz soundfont-with-vis
+            baseUrl: 'https://gleitz.github.io/soundfont-player/mp3/violin-mp3/',
+            urls: { C3: 'C3.mp3', G3: 'G3.mp3', C4: 'C4.mp3', G4: 'G4.mp3', C5: 'C5.mp3', G5: 'G5.mp3' }
         },
         trumpet: {
-            'C3': 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/trumpet-mp3/C3.mp3',
-            'C4': 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/trumpet-mp3/C4.mp3',
-            'C5': 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/trumpet-mp3/C5.mp3'
+            baseUrl: 'https://gleitz.github.io/soundfont-player/mp3/trumpet-mp3/',
+            urls: { C3: 'C3.mp3', G3: 'G3.mp3', C4: 'C4.mp3', G4: 'G4.mp3', C5: 'C5.mp3', G5: 'G5.mp3' }
         },
         acoustic_guitar_steel: {
-            'C3': 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/acoustic_guitar_steel-mp3/C3.mp3',
-            'C4': 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/acoustic_guitar_steel-mp3/C4.mp3',
-            'C5': 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/acoustic_guitar_steel-mp3/C5.mp3'
+            baseUrl: 'https://gleitz.github.io/soundfont-player/mp3/acoustic_guitar_steel-mp3/',
+            urls: { C3: 'C3.mp3', G3: 'G3.mp3', C4: 'C4.mp3', G4: 'G4.mp3', C5: 'C5.mp3', G5: 'G5.mp3' }
         },
         acoustic_bass: {
-            'C2': 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/acoustic_bass-mp3/C2.mp3',
-            'C3': 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/acoustic_bass-mp3/C3.mp3',
-            'C4': 'https://gleitz.github.io/midi-js-soundfonts/FatBoy/acoustic_bass-mp3/C4.mp3'
+            baseUrl: 'https://gleitz.github.io/soundfont-player/mp3/acoustic_bass-mp3/',
+            urls: { C2: 'C2.mp3', G2: 'G2.mp3', C3: 'C3.mp3', G3: 'G3.mp3', C4: 'C4.mp3' }
         }
     };
 
     // ============================================================
-    // 2. DOM REFS & UTILS
+    // 2. DOM refs
     // ============================================================
     const $ = id => document.getElementById(id);
     const lyricsInput = $('lyrics-input');
@@ -1342,7 +1443,6 @@
     const popupClose = $('popup-close');
     const popupRemoveNote = $('popup-remove-note');
     const clearGroupsBtn = $('clear-groups-btn');
-    const addLineBtn = $('add-line-btn');
     const backToEditorBtn = $('back-to-editor-btn');
     const shareFromPlayerBtn = $('share-from-player-btn');
     const groupCount = $('group-count');
@@ -1353,43 +1453,77 @@
     const volValue = $('vol-value');
     const toggleNotes = $('toggle-notes');
 
-    function escapeHtml(str) {
-        return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-    }
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    const screens = {
+        editor: $('editor-screen'),
+        player: $('player-screen')
+    };
 
     // ============================================================
     // 3. AUDIO ENGINE with Tone.Sampler
     // ============================================================
+    function getAudioCtx() {
+        if (!state.audioCtx) {
+            state.audioCtx = Tone.getContext().rawContext;
+        }
+        return state.audioCtx;
+    }
+
     function updateMasterVolume() {
-        if (Tone.destination) {
-            if (state.volume <= 0) {
-                Tone.destination.mute = true;
-            } else {
-                Tone.destination.mute = false;
-                Tone.destination.volume.value = Tone.gainToDb(state.volume * 1.5);
-            }
+        if (state.volumeNode) {
+            // Volume formula mapped smoothly to gain
+            const gainVal = state.volume * 2.0;
+            state.volumeNode.gain.setValueAtTime(gainVal, Tone.now());
         }
     }
 
-    function getToneNote(note) {
+    function initAudioNodes() {
+        if (!state.volumeNode) {
+            state.volumeNode = Tone.getContext().createGain();
+            state.limiterNode = Tone.getContext().createDynamicsCompressor();
+            
+            state.limiterNode.threshold.value = -3;
+            state.limiterNode.knee.value = 5;
+            state.limiterNode.ratio.value = 20;
+            state.limiterNode.attack.value = 0.001;
+            state.limiterNode.release.value = 0.12;
+
+            state.volumeNode.connect(state.limiterNode);
+            Tone.connect(state.limiterNode, Tone.Destination);
+            updateMasterVolume();
+        }
+    }
+
+    function getSoundfontNote(note) {
+        // Convert European H to B for Tone.js
         return state.noteMap[note] || note;
     }
 
+    // Load instrument using Tone.Sampler
     function loadInstrument(instrumentName) {
         return new Promise((resolve, reject) => {
-            state.instrument = instrumentName;
-            
-            if (state.sampler) {
-                state.sampler.dispose();
-                state.sampler = null;
+            if (Tone.context.state !== 'running') {
+                Tone.start();
+            }
+            initAudioNodes();
+
+            // Dispose previous sampler if exists
+            if (state.soundfont) {
+                try {
+                    state.soundfont.dispose();
+                } catch(e) {}
+                state.soundfont = null;
             }
 
+            // If it's sine wave, we don't need to load samples
             if (instrumentName === 'sine') {
                 state.instrumentLoaded = true;
+                state.soundfont = null;
                 resolve();
                 return;
             }
 
+            // Show loading state
             document.querySelectorAll('.instrument-btn').forEach(btn => {
                 if (btn.dataset.instrument === instrumentName) {
                     btn.classList.add('loading');
@@ -1397,12 +1531,22 @@
                 }
             });
 
-            const samples = SAMPLE_MAPS[instrumentName] || SAMPLE_MAPS.acoustic_grand_piano;
+            const config = INSTRUMENT_SAMPLES[instrumentName];
+            if (!config) {
+                state.instrumentLoaded = true;
+                resolve();
+                return;
+            }
 
-            state.sampler = new Tone.Sampler({
-                urls: samples,
+            const sampler = new Tone.Sampler({
+                urls: config.urls,
+                baseUrl: config.baseUrl,
                 onload: () => {
+                    state.soundfont = sampler;
+                    state.soundfont.connect(state.volumeNode);
                     state.instrumentLoaded = true;
+
+                    // Reset button text
                     document.querySelectorAll('.instrument-btn').forEach(btn => {
                         btn.classList.remove('loading');
                         if (btn.dataset.instrument === instrumentName) {
@@ -1410,68 +1554,84 @@
                             btn.innerHTML = `${meta.icon} <span class="label">${meta.label}</span>`;
                         }
                     });
+
+                    console.log(`✅ Інструмент "${instrumentName}" завантажено`);
                     resolve();
                 },
                 onerror: (err) => {
-                    state.sampler = null;
+                    console.error('❌ Помилка завантаження інструменту:', err);
+                    state.soundfont = null;
                     state.instrumentLoaded = true;
+
                     document.querySelectorAll('.instrument-btn').forEach(btn => {
                         btn.classList.remove('loading');
                     });
+
                     reject(err);
                 }
-            }).toDestination();
+            });
         });
     }
 
     const NOTE_PREVIEW_DURATION = 0.5;
 
-    function playToneSamplerNote(noteName, duration = NOTE_PREVIEW_DURATION) {
-        if (Tone.context.state !== 'running') Tone.start();
+    function playSoundfontNote(noteName, duration = NOTE_PREVIEW_DURATION) {
+        if (Tone.context.state !== 'running') {
+            Tone.start();
+        }
 
-        if (state.instrument === 'sine' || !state.sampler || !state.instrumentLoaded) {
+        if (state.instrument === 'sine' || !state.soundfont) {
             playOscillatorNote(noteName, duration);
             return;
         }
 
         try {
-            const tNote = getToneNote(noteName);
-            state.sampler.triggerAttackRelease(tNote, duration);
+            const sfNote = getSoundfontNote(noteName);
+            state.soundfont.triggerAttackRelease(sfNote, duration);
         } catch (e) {
+            console.warn('Tone.Sampler playback error, using oscillator:', e);
             playOscillatorNote(noteName, duration);
         }
     }
 
-    function playContinuousSamplerNote(noteName, groupId) {
-        if (Tone.context.state !== 'running') Tone.start();
+    function playContinuousSoundfontNote(noteName, groupId) {
+        if (Tone.context.state !== 'running') {
+            Tone.start();
+        }
 
         stopContinuousNote(groupId);
 
-        if (state.instrument === 'sine' || !state.sampler || !state.instrumentLoaded) {
+        if (state.instrument === 'sine' || !state.soundfont) {
             const result = createOscillatorNode(noteName, true);
-            if (result) state.activeNotes.set(groupId, result);
+            if (result) {
+                state.activeNotes.set(groupId, result);
+            }
             return;
         }
 
         try {
-            const tNote = getToneNote(noteName);
-            state.sampler.triggerAttack(tNote);
+            const sfNote = getSoundfontNote(noteName);
+            state.soundfont.triggerAttack(sfNote);
 
             state.activeNotes.set(groupId, {
-                type: 'sampler',
-                noteName: tNote,
+                type: 'soundfont',
+                noteName: sfNote,
                 stop: () => {
-                    try {
-                        if (state.sampler) state.sampler.triggerRelease(tNote);
-                    } catch (e) {}
+                    try { state.soundfont.triggerRelease(sfNote); } catch (e) {}
                 }
             });
         } catch (e) {
+            console.warn('Continuous Tone.Sampler error, using oscillator:', e);
             const result = createOscillatorNode(noteName, true);
-            if (result) state.activeNotes.set(groupId, result);
+            if (result) {
+                state.activeNotes.set(groupId, result);
+            }
         }
     }
 
+    // ============================================================
+    // 4. OSCILLATOR FALLBACK (for sine wave and errors)
+    // ============================================================
     const noteFreq = {
         'C3': 130.81, 'C#3': 138.59, 'D3': 146.83, 'D#3': 155.56,
         'E3': 164.81, 'F3': 174.61, 'F#3': 185.00, 'G3': 196.00,
@@ -1484,42 +1644,68 @@
         'G#5': 830.61, 'A5': 880.00, 'A#5': 932.33, 'H5': 987.77
     };
 
-    function createOscillatorNode(noteName) {
-        if (Tone.context.state !== 'running') Tone.start();
-        const tNote = getToneNote(noteName);
+    function createOscillatorNode(noteName, isContinuous = false) {
+        const ctx = getAudioCtx();
+        const freq = noteFreq[noteName];
+        if (!freq) return null;
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
         
-        const synth = new Tone.Synth({
-            oscillator: { type: state.instrument === 'sine' ? 'sine' : 'triangle' },
-            envelope: { attack: 0.01, decay: 0.1, sustain: 0.8, release: 0.1 }
-        }).toDestination();
-
-        synth.triggerAttack(tNote);
-
+        osc.type = state.instrument === 'sine' ? 'sine' : 'triangle';
+        osc.frequency.value = freq;
+        
+        const now = ctx.currentTime;
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.9, now + 0.01);
+        gain.gain.setValueAtTime(0.9, now + 0.1);
+        
+        osc.connect(gain);
+        gain.connect(state.volumeNode || ctx.destination);
+        osc.start(now);
+        
         return {
-            type: 'synth',
-            synth: synth,
+            type: 'oscillator',
+            osc: osc,
+            gain: gain,
             stop: () => {
                 try {
-                    synth.triggerRelease();
-                    setTimeout(() => synth.dispose(), 200);
+                    const stopTime = gain.context.currentTime;
+                    gain.gain.setValueAtTime(gain.gain.value, stopTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, stopTime + 0.04);
+                    osc.stop(stopTime + 0.05);
                 } catch (e) {}
             }
         };
     }
 
     function playOscillatorNote(noteName, duration = 0.6) {
-        if (Tone.context.state !== 'running') Tone.start();
-        const tNote = getToneNote(noteName);
-        
-        const synth = new Tone.Synth({
-            oscillator: { type: state.instrument === 'sine' ? 'sine' : 'triangle' },
-            envelope: { attack: 0.01, decay: 0.1, sustain: 0.7, release: 0.2 }
-        }).toDestination();
+        const ctx = getAudioCtx();
+        const freq = noteFreq[noteName];
+        if (!freq) return;
 
-        synth.triggerAttackRelease(tNote, duration);
-        setTimeout(() => synth.dispose(), (duration + 0.3) * 1000);
+        if (ctx.state === 'suspended') ctx.resume();
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        
+        osc.type = state.instrument === 'sine' ? 'sine' : 'triangle';
+        osc.frequency.value = freq;
+        
+        const now = ctx.currentTime;
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(1.0, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        
+        osc.connect(gain);
+        gain.connect(state.volumeNode || ctx.destination);
+        osc.start(now);
+        osc.stop(now + duration);
     }
 
+    // ============================================================
+    // 5. MAIN AUDIO FUNCTIONS
+    // ============================================================
     function shiftOctaveDown(noteName) {
         const match = noteName.match(/^([A-H]#?)(\d)$/);
         if (!match) return noteName;
@@ -1528,26 +1714,30 @@
     }
 
     function getPlaybackNote(noteName) {
-        if (state.instrument === 'acoustic_bass') return shiftOctaveDown(noteName);
+        if (state.instrument === 'acoustic_bass') {
+            return shiftOctaveDown(noteName);
+        }
         return noteName;
     }
 
     function playNote(noteName, duration = NOTE_PREVIEW_DURATION) {
         const playbackNote = getPlaybackNote(noteName);
-        if (state.instrument === 'sine' || !state.sampler || !state.instrumentLoaded) {
+        if (state.instrument === 'sine' || !state.soundfont || !state.instrumentLoaded) {
             playOscillatorNote(playbackNote, duration);
         } else {
-            playToneSamplerNote(playbackNote, duration);
+            playSoundfontNote(playbackNote, duration);
         }
     }
 
     function startContinuousNote(noteName, groupId) {
         const playbackNote = getPlaybackNote(noteName);
-        if (state.instrument === 'sine' || !state.sampler || !state.instrumentLoaded) {
+        if (state.instrument === 'sine' || !state.soundfont || !state.instrumentLoaded) {
             const result = createOscillatorNode(playbackNote, true);
-            if (result) state.activeNotes.set(groupId, result);
+            if (result) {
+                state.activeNotes.set(groupId, result);
+            }
         } else {
-            playContinuousSamplerNote(playbackNote, groupId);
+            playContinuousSoundfontNote(playbackNote, groupId);
         }
     }
 
@@ -1560,7 +1750,9 @@
     }
 
     function stopAllContinuous() {
-        for (const [id] of state.activeNotes) stopContinuousNote(id);
+        for (const [id] of state.activeNotes) {
+            stopContinuousNote(id);
+        }
         state.holdingId = null;
     }
 
@@ -1569,7 +1761,7 @@
     }
 
     // ============================================================
-    // 4. TEXT PARSING & GROUP CREATION
+    // 6. TEXT PARSING & SMART GROUP PRESERVATION
     // ============================================================
     function isCyrillic(char) {
         return /[\u0400-\u04FF]/.test(char);
@@ -1580,16 +1772,29 @@
         let cleaned = line.replace(/[A-Za-z]/g, '');
         cleaned = cleaned.replace(/[^\u0400-\u04FF\s.,!?;:()\-–—«»"']/g, '');
 
-        if (!/[\u0400-\u04FF]/.test(cleaned)) return '';
-        if (hadLatin) return cleaned.replace(/[ \t]+/g, ' ').trim();
+        if (!/[\u0400-\u04FF]/.test(cleaned)) {
+            return '';
+        }
+
+        if (hadLatin) {
+            return cleaned.replace(/[ \t]+/g, ' ').trim();
+        }
+
         return cleaned;
     }
 
     function cleanLyricsText(text) {
         return text.split('\n')
-            .filter(line => line.trim() === '' || cleanLyricsLine(line) !== '')
+            .filter(line => {
+                if (line.trim() === '') return true;
+                return cleanLyricsLine(line) !== '';
+            })
             .map(cleanLyricsLine)
             .join('\n');
+    }
+
+    function removeLatin(text) {
+        return cleanLyricsText(text);
     }
 
     function isPunctuation(char) {
@@ -1628,10 +1833,15 @@
         let current = '';
         for (const w of words) {
             if (w.length === 1 && isPunctuation(w)) {
-                if (current.length > 0) current += w;
-                else result.push(w);
+                if (current.length > 0) {
+                    current += w;
+                } else {
+                    result.push(w);
+                }
             } else {
-                if (current.length > 0) result.push(current);
+                if (current.length > 0) {
+                    result.push(current);
+                }
                 current = w;
             }
         }
@@ -1668,12 +1878,13 @@
                 const oldWordCount = oldWords.length;
                 const possibleMatch = newLineWords.slice(wordIdx, wordIdx + oldWordCount);
 
-                if (possibleMatch.length === oldWordCount && possibleMatch.join(' ') === oldWords.join(' ')) {
+                if (possibleMatch.length === oldWordCount &&
+                    possibleMatch.join(' ') === oldWords.join(' ')) {
                     newGroups.push({
                         words: oldWords,
                         note: oldGroup.note,
                         duration: oldGroup.duration || 0.6,
-                        _detectedNoteIds: Array.isArray(oldGroup._detectedNoteIds) ? [...oldGroup._detectedNoteIds] : []
+                        _detectedNoteIds: Array.isArray(oldGroup._detectedNoteIds) ? [...oldGroup._detectedNoteIds] : (oldGroup._detectedNoteId ? [oldGroup._detectedNoteId] : [])
                     });
                     wordIdx += oldWordCount;
                 } else {
@@ -1690,7 +1901,7 @@
                             words: [w],
                             note: foundNote,
                             duration: oldGroup.duration || 0.6,
-                            _detectedNoteIds: Array.isArray(oldGroup._detectedNoteIds) ? [...oldGroup._detectedNoteIds] : []
+                            _detectedNoteIds: Array.isArray(oldGroup._detectedNoteIds) ? [...oldGroup._detectedNoteIds] : (oldGroup._detectedNoteId ? [oldGroup._detectedNoteId] : [])
                         });
                     }
                     wordIdx = newLineWords.length;
@@ -1724,7 +1935,7 @@
             words: [...g.words],
             note: g.note,
             duration: g.duration || 0.6,
-            _detectedNoteIds: Array.isArray(g._detectedNoteIds) ? [...g._detectedNoteIds] : []
+            _detectedNoteIds: Array.isArray(g._detectedNoteIds) ? [...g._detectedNoteIds] : (g._detectedNoteId ? [g._detectedNoteId] : [])
         }));
     }
 
@@ -1765,16 +1976,7 @@
             const existingGroups = (existingLine && !existingLine.isEmpty) ? existingLine.groups : [];
             const newGroups = computeGroupsForLineText(newLine, existingGroups);
 
-            preservedLines.push({
-                groups: newGroups,
-                isEmpty: false,
-                collapsed: prevCollapsed,
-                detectedNotes: existingLine?.detectedNotes || [],
-                rawText: newLine,
-                draft: !!existingLine?.draft,
-                audioData: existingLine?.audioData || null,
-                notesCollapsed: !!existingLine?.notesCollapsed
-            });
+            preservedLines.push({ groups: newGroups, isEmpty: false, collapsed: prevCollapsed, detectedNotes: existingLine?.detectedNotes || [], rawText: newLine, draft: !!existingLine?.draft, audioData: existingLine?.audioData || null, notesCollapsed: !!existingLine?.notesCollapsed });
         }
 
         state.lines = preservedLines;
@@ -1783,11 +1985,15 @@
     function syncDetectedNoteLinks(line) {
         if (!line) return;
         const notes = line.detectedNotes || [];
-        notes.forEach(n => { n.groupIdxs = []; });
+        notes.forEach(n => {
+            n.groupIdxs = [];
+            delete n.groupIdx;
+        });
         line.groups.forEach((g, gi) => {
             const ids = groupDetectedIds(g);
             if (!ids.length) return;
             g._detectedNoteIds = [ids[0]];
+            delete g._detectedNoteId;
             const n = notes.find(x => x.id === ids[0]);
             if (n) n.groupIdxs.push(gi);
         });
@@ -1806,7 +2012,7 @@
                 collapsed: line.collapsed,
                 audioData: line.audioData || null,
                 notesCollapsed: !!line.notesCollapsed,
-                detectedNotes: line.detectedNotes || []
+                detectedNotes: (line.detectedNotes || []).map(n => ({...n, groupIdxs: Array.isArray(n.groupIdxs) ? [...n.groupIdxs] : (n.groupIdx != null ? [n.groupIdx] : [])}))
             };
         } else {
             const existingGroups = line.isEmpty ? [] : line.groups;
@@ -1819,7 +2025,7 @@
                 collapsed: line.collapsed,
                 audioData: line.audioData || null,
                 notesCollapsed: !!line.notesCollapsed,
-                detectedNotes: line.detectedNotes || []
+                detectedNotes: (line.detectedNotes || []).map(n => ({...n, groupIdxs: Array.isArray(n.groupIdxs) ? [...n.groupIdxs] : (n.groupIdx != null ? [n.groupIdx] : [])}))
             };
         }
 
@@ -1903,6 +2109,23 @@
         groupCount.textContent = `${state.lines.reduce((sum, currentLine) => sum + (currentLine.isEmpty ? 0 : currentLine.groups.length), 0)} груп`;
     }
 
+    function handleLineTextCommit(lineIdx, newLineText) {
+        const line = state.lines[lineIdx];
+        if (!line) return;
+        handleLineTextLiveEdit(lineIdx, newLineText);
+    }
+
+    function toggleLineCollapsed(lineIdx) {
+        const line = state.lines[lineIdx];
+        if (!line) return;
+        line.collapsed = !line.collapsed;
+        renderAll();
+    }
+
+
+    // ============================================================
+    // 6.5 LINE CREATION + MICROPHONE ANALYSIS
+    // ============================================================
     function addEmptyLine() {
         state.lines.push({ groups: [], isEmpty: false, draft: true, rawText: '', collapsed: false, audioData: null, detectedNotes: [], notesCollapsed: false });
         updateTextareaFromState();
@@ -1913,8 +2136,129 @@
         });
     }
 
+    function arrayBufferToBase64(buffer) {
+        const bytes = new Uint8Array(buffer);
+        let binary = '';
+        const chunk = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+        return btoa(binary);
+    }
+
+    function frequencyToNearestNote(freq) {
+        if (!freq || !isFinite(freq)) return null;
+        let best = null, bestDiff = Infinity;
+        for (const note of state.notes) {
+            const f = noteFreq[note];
+            const diff = Math.abs(12 * Math.log2(freq / f));
+            if (diff < bestDiff) { bestDiff = diff; best = note; }
+        }
+        return bestDiff <= 1.2 ? best : null;
+    }
+
+    function detectPitchAutocorrelation(buffer, sampleRate, start, size) {
+        let rms = 0;
+        for (let i = 0; i < size; i++) rms += buffer[start + i] * buffer[start + i];
+        rms = Math.sqrt(rms / size);
+        if (rms < 0.012) return null;
+        const minLag = Math.max(1, Math.floor(sampleRate / 1100));
+        const maxLag = Math.min(Math.floor(sampleRate / 70), size - 2);
+        let bestLag = -1, best = 0;
+        for (let lag = minLag; lag <= maxLag; lag++) {
+            let corr = 0;
+            for (let i = 0; i < size - lag; i++) corr += buffer[start + i] * buffer[start + i + lag];
+            if (corr > best) { best = corr; bestLag = lag; }
+        }
+        if (bestLag < 0) return null;
+        const freq = sampleRate / bestLag;
+        return frequencyToNearestNote(freq);
+    }
+
+    async function analyzeRecordedPitch(blob) {
+        const ctx = getAudioCtx();
+        const audioBuffer = await ctx.decodeAudioData(await blob.arrayBuffer());
+        const data = audioBuffer.getChannelData(0);
+        const sampleRate = audioBuffer.sampleRate;
+        const frame = 4096;
+        const hop = 1024;
+        const raw = [];
+        for (let start = 0; start + frame <= data.length; start += hop) {
+            const note = detectPitchAutocorrelation(data, sampleRate, start, frame);
+            raw.push({ note, start: start / sampleRate, end: (start + hop) / sampleRate });
+        }
+        const segments = [];
+        for (const item of raw) {
+            if (!item.note) continue;
+            const last = segments[segments.length - 1];
+            if (last && last.note === item.note && item.start - last.end < 0.12) last.end = item.end;
+            else segments.push({ note: item.note, start: item.start, end: item.end });
+        }
+        return segments.filter(s => s.end - s.start >= 0.10).map(s => ({ note: s.note, duration: Math.max(0.1, s.end - s.start) }));
+    }
+
+    async function finishLineRecording(lineIdx, chunks, mimeType) {
+        const blob = new Blob(chunks, { type: mimeType });
+        const audioData = { type: mimeType, base64: arrayBufferToBase64(await blob.arrayBuffer()) };
+        const status = groupsContainer.querySelector(`[data-record-status="${lineIdx}"]`);
+        if (status) { status.textContent = 'Аналіз висоти та тривалості нот…'; status.classList.add('processing'); }
+        try {
+            const detectedNotes = await analyzeRecordedPitch(blob);
+            const line = state.lines[lineIdx];
+            if (!line) return;
+            line.audioData = audioData;
+            line.detectedNotes = detectedNotes.map((n, i) => ({
+                id: `n-${Date.now()}-${i}`,
+                note: n.note,
+                duration: n.duration,
+                groupIdxs: []
+            }));
+            renderAll();
+        } catch (e) {
+            console.error('Audio analysis error:', e);
+            const line = state.lines[lineIdx];
+            if (line) line.audioData = audioData;
+            renderAll();
+            alert('Запис збережено, але автоматично визначити ноти не вдалося. Спробуйте ще раз у тихішому місці.');
+        }
+    }
+
+    async function toggleLineRecording(lineIdx) {
+        if (state.recording) {
+            if (state.recording.lineIdx === lineIdx) {
+                state.recording.recorder.stop();
+            } else {
+                alert('Спочатку зупиніть поточний запис.');
+            }
+            return;
+        }
+        if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+            alert('Цей браузер не підтримує запис з мікрофона. Спробуйте Chrome або Safari.');
+            return;
+        }
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+            const preferred = ['audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/mp4'].find(t => MediaRecorder.isTypeSupported(t));
+            const recorder = new MediaRecorder(stream, preferred ? { mimeType: preferred } : undefined);
+            const chunks = [];
+            state.recording = { lineIdx, recorder, stream };
+            const status = groupsContainer.querySelector(`[data-record-status="${lineIdx}"]`);
+            const btn = groupsContainer.querySelector(`.record-line-btn[data-line="${lineIdx}"]`);
+            if (status) { status.textContent = 'Запис…'; status.classList.add('recording'); }
+            if (btn) { btn.textContent = '⏹ Зупинити запис'; btn.classList.add('btn-danger'); }
+            recorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+            recorder.onstop = async () => {
+                stream.getTracks().forEach(t => t.stop());
+                state.recording = null;
+                await finishLineRecording(lineIdx, chunks, recorder.mimeType || 'audio/webm');
+            };
+            recorder.start(200);
+        } catch (e) {
+            console.error(e);
+            alert('Не вдалося отримати доступ до мікрофона. Дозвольте використання мікрофона для цієї сторінки.');
+        }
+    }
+
     // ============================================================
-    // 5. GROUP OPERATIONS
+    // 7. STATE OPERATIONS
     // ============================================================
     function getGroup(lineIdx, groupIdx) {
         const line = state.lines[lineIdx];
@@ -1922,39 +2266,258 @@
         return line.groups[groupIdx] || null;
     }
 
-    function groupDetectedIds(group) {
-        if (!group) return [];
-        if (Array.isArray(group._detectedNoteIds)) return group._detectedNoteIds;
-        return [];
-    }
-
     function setGroupNote(lineIdx, groupIdx, note) {
         const g = getGroup(lineIdx, groupIdx);
         if (!g) return;
+        const line = state.lines[lineIdx];
+        const ids = Array.isArray(g._detectedNoteIds) ? [...g._detectedNoteIds] : (g._detectedNoteId ? [g._detectedNoteId] : []);
+        ids.forEach(id => {
+            const detected = line.detectedNotes?.find(n => n.id === id);
+            if (detected) detected.groupIdxs = (detected.groupIdxs || []).filter(i => i !== groupIdx);
+        });
+        delete g._detectedNoteIds;
+        delete g._detectedNoteId;
         g.note = note;
         if (note && !g.duration) g.duration = 0.6;
         if (note) playNoteOnce(note);
         renderAll();
     }
 
+    function clearDetectedNotes(lineIdx) {
+        const line = state.lines[lineIdx];
+        if (!line) return;
+        line.detectedNotes = [];
+        line.groups.forEach(g => { g.note = null; g.duration = 0.6; delete g._detectedNoteIds; delete g._detectedNoteId; });
+        renderAll();
+    }
+
+    function normalizeDetectedNoteLinks(line, note) {
+        if (!Array.isArray(note.groupIdxs)) {
+            note.groupIdxs = note.groupIdx != null ? [note.groupIdx] : [];
+            delete note.groupIdx;
+        }
+        return note.groupIdxs;
+    }
+
+    function groupDetectedIds(group) {
+        if (!group) return [];
+        if (Array.isArray(group._detectedNoteIds)) return group._detectedNoteIds;
+        return group._detectedNoteId ? [group._detectedNoteId] : [];
+    }
+
+    function noteLetter(note) {
+        return (note || '').replace(/\d/g, '');
+    }
+
+    function attachDetectedNote(lineIdx, noteId, groupIdx) {
+        const line = state.lines[lineIdx];
+        if (!line) return;
+        const detected = (line.detectedNotes || []).find(n => n.id === noteId);
+        const target = line.groups[groupIdx];
+        if (!detected || !target) return;
+        const links = normalizeDetectedNoteLinks(line, detected);
+
+        const existingIds = groupDetectedIds(target).filter(id => id !== noteId);
+        const sameLetterIds = existingIds.filter(id => {
+            const other = line.detectedNotes.find(n => n.id === id);
+            return other && noteLetter(other.note) === noteLetter(detected.note);
+        });
+        const keepIds = (sameLetterIds.length === existingIds.length && existingIds.length < 2)
+            ? existingIds
+            : [];
+        const newIds = [...keepIds, noteId];
+
+        existingIds.forEach(oldId => {
+            if (newIds.includes(oldId)) return;
+            const previous = line.detectedNotes.find(n => n.id === oldId);
+            if (previous) {
+                normalizeDetectedNoteLinks(line, previous);
+                previous.groupIdxs = previous.groupIdxs.filter(i => i !== groupIdx);
+            }
+        });
+
+        target._detectedNoteIds = newIds;
+        delete target._detectedNoteId;
+        target.note = detected.note;
+        target.duration = newIds.reduce((sum, id) => {
+            const n = line.detectedNotes.find(x => x.id === id);
+            return sum + (n ? n.duration : 0);
+        }, 0) || detected.duration;
+        if (!links.includes(groupIdx)) links.push(groupIdx);
+        detected.groupIdxs = links;
+        playNoteOnce(detected.note);
+        renderAll();
+    }
+
+    function detachDetectedNote(lineIdx, noteId, groupIdx = null) {
+        const line = state.lines[lineIdx];
+        if (!line) return;
+        const detected = (line.detectedNotes || []).find(n => n.id === noteId);
+        if (!detected) return;
+        const links = normalizeDetectedNoteLinks(line, detected);
+        const toRemove = groupIdx == null ? [...links] : [groupIdx];
+        toRemove.forEach(gi => {
+            if (line.groups[gi]) {
+                const g = line.groups[gi];
+                const ids = groupDetectedIds(g).filter(id => id !== noteId);
+                if (ids.length) g._detectedNoteIds = ids;
+                else {
+                    delete g._detectedNoteIds;
+                    delete g._detectedNoteId;
+                    g.note = null;
+                    g.duration = 0.6;
+                }
+            }
+        });
+        detected.groupIdxs = links.filter(i => !toRemove.includes(i));
+        renderAll();
+    }
+
+    function renderDetectedNoteConnections(lineIdx, visual) {
+        const line = state.lines[lineIdx];
+        if (!line || line.notesCollapsed) return;
+        const svg = visual.querySelector('.line-notes-connections');
+        if (!svg) return;
+        const box = visual.getBoundingClientRect();
+        svg.setAttribute('viewBox', `0 0 ${Math.max(1, box.width)} ${Math.max(1, box.height)}`);
+        svg.innerHTML = '';
+        (line.detectedNotes || []).forEach(n => {
+            const noteEl = visual.querySelector(`.detected-note[data-note-id="${CSS.escape(n.id)}"]`);
+            if (!noteEl) return;
+            const links = Array.isArray(n.groupIdxs) ? n.groupIdxs : (n.groupIdx != null ? [n.groupIdx] : []);
+            links.forEach(groupIdx => {
+                const chip = visual.querySelector(`.chip[data-group="${groupIdx}"]`);
+                if (!chip) return;
+                const a = noteEl.getBoundingClientRect();
+                const b = chip.getBoundingClientRect();
+                const x1 = a.left + a.width / 2 - box.left;
+                const y1 = a.bottom - box.top;
+                const x2 = b.left + b.width / 2 - box.left;
+                const y2 = b.top - box.top;
+                const lineEl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                lineEl.setAttribute('x1', x1);
+                lineEl.setAttribute('y1', y1);
+                lineEl.setAttribute('x2', x2);
+                lineEl.setAttribute('y2', y2);
+                lineEl.setAttribute('stroke', 'currentColor');
+                lineEl.setAttribute('stroke-width', '2.5');
+                lineEl.setAttribute('stroke-linecap', 'round');
+                lineEl.setAttribute('opacity', '0.6');
+                svg.appendChild(lineEl);
+            });
+        });
+    }
+
+    function setupDetectedNoteDrag(lineIdx, noteEl, visual) {
+        let drag = null;
+        let lastTapAt = 0;
+        const clearTargets = () => visual.querySelectorAll('.note-drop-target').forEach(el => el.classList.remove('note-drop-target'));
+        const removeDetectedNote = (id) => {
+            const line = state.lines[lineIdx];
+            if (!line) return;
+            const n = line.detectedNotes?.find(x => x.id === id);
+            if (!n) return;
+            line.groups.forEach(g => {
+                const ids = groupDetectedIds(g).filter(x => x !== id);
+                if (ids.length) g._detectedNoteIds = ids;
+                else if (groupDetectedIds(g).length) {
+                    delete g._detectedNoteIds; delete g._detectedNoteId;
+                    g.note = null; g.duration = 0.6;
+                }
+            });
+            line.detectedNotes = line.detectedNotes.filter(x => x.id !== id);
+            renderAll();
+        };
+        const onMove = e => {
+            if (!drag) return;
+            const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
+            if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+            drag.moved = true;
+            const ghost = drag.ghost;
+            ghost.style.left = `${e.clientX - drag.offsetX}px`;
+            ghost.style.top = `${e.clientY - drag.offsetY}px`;
+            clearTargets();
+            const under = document.elementFromPoint(e.clientX, e.clientY);
+            const chip = under?.closest?.('.chip');
+            if (chip && chip.closest('.line-block')?.dataset.line === String(lineIdx)) chip.classList.add('note-drop-target');
+        };
+        const finish = e => {
+            if (!drag) return;
+            const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
+            const distance = Math.hypot(dx, dy);
+            const elapsed = performance.now() - drag.startedAt;
+            const isFling = distance >= 100 && elapsed <= 650;
+            const under = document.elementFromPoint(e.clientX, e.clientY);
+            const chip = under?.closest?.('.chip');
+            const lineBlock = visual.closest('.line-block');
+            const blockRect = lineBlock ? lineBlock.getBoundingClientRect() : null;
+            const outsideBlock = blockRect ? (
+                e.clientX < blockRect.left || e.clientX > blockRect.right ||
+                e.clientY < blockRect.top || e.clientY > blockRect.bottom
+            ) : false;
+            const isTouch = e.pointerType === 'touch';
+            clearTargets();
+            drag.ghost.remove();
+            noteEl.classList.remove('drag-source');
+            noteEl.releasePointerCapture?.(e.pointerId);
+            if (drag.moved && chip && chip.closest('.line-block')?.dataset.line === String(lineIdx)) {
+                attachDetectedNote(lineIdx, noteEl.dataset.noteId, parseInt(chip.dataset.group));
+            } else if (drag.moved && outsideBlock && (isTouch ? isFling : true)) {
+                removeDetectedNote(noteEl.dataset.noteId);
+            }
+            drag = null;
+        };
+        noteEl.addEventListener('pointerdown', e => {
+            e.preventDefault();
+            const now = performance.now();
+            if (now - lastTapAt < 320) {
+                lastTapAt = 0;
+                openDetectedNotePopup(lineIdx, noteEl.dataset.noteId);
+                return;
+            }
+            lastTapAt = now;
+            const r = noteEl.getBoundingClientRect();
+            const ghost = noteEl.cloneNode(true);
+            ghost.classList.add('detected-note-drag-ghost');
+            Object.assign(ghost.style, { position:'fixed', left:`${r.left}px`, top:`${r.top}px`, width:`${r.width}px`, margin:'0', pointerEvents:'none', zIndex:'9999' });
+            document.body.appendChild(ghost);
+            noteEl.classList.add('drag-source');
+            drag = { startX:e.clientX, startY:e.clientY, offsetX:e.clientX-r.left, offsetY:e.clientY-r.top, moved:false, startedAt:performance.now(), ghost };
+            try { noteEl.setPointerCapture(e.pointerId); } catch(err){}
+        });
+        noteEl.addEventListener('pointermove', onMove);
+        noteEl.addEventListener('pointerup', finish);
+        noteEl.addEventListener('pointercancel', finish);
+    }
+
+    function openDetectedNotePopup(lineIdx, noteId) {
+        const line = state.lines[lineIdx];
+        if (!line) return;
+        const item = line.detectedNotes?.find(n => n.id === noteId);
+        if (!item) return;
+        state.editing = { type: 'detected', lineIdx, noteId };
+        state.tempNote = item.note;
+        renderNoteGrid();
+        notePopup.classList.add('open');
+    }
+
     function mergeGroupWithNext(lineIdx, groupIdx) {
         const line = state.lines[lineIdx];
         if (!line || line.isEmpty) return;
-        const groups = line.groups;
-        if (groupIdx < 0 || groupIdx >= groups.length - 1) return;
+        if (groupIdx >= line.groups.length - 1) return;
 
-        const current = groups[groupIdx];
-        const next = groups[groupIdx + 1];
+        const g1 = line.groups[groupIdx];
+        const g2 = line.groups[groupIdx + 1];
 
-        const mergedWords = [...current.words, ...next.words];
-        const note = current.note !== null ? current.note : next.note;
+        const mergedGroup = {
+            words: [...g1.words, ...g2.words],
+            note: g1.note || g2.note || null,
+            duration: Math.max(0.1, (g1.duration || 0.6) + (g2.duration || 0.6)),
+            _detectedNoteIds: Array.from(new Set([...groupDetectedIds(g1), ...groupDetectedIds(g2)]))
+        };
 
-        groups.splice(groupIdx, 2, {
-            words: mergedWords,
-            note: note,
-            duration: (current.duration || 0.6) + (next.duration || 0.6)
-        });
-
+        line.groups.splice(groupIdx, 2, mergedGroup);
+        syncDetectedNoteLinks(line);
         updateTextareaFromState();
         renderAll();
     }
@@ -1962,369 +2525,870 @@
     function splitGroup(lineIdx, groupIdx) {
         const line = state.lines[lineIdx];
         if (!line || line.isEmpty) return;
-        const group = line.groups[groupIdx];
-        if (!group || group.words.length <= 1) return;
+        const g = line.groups[groupIdx];
+        if (!g || g.words.length <= 1) return;
 
-        const words = group.words;
-        const lastWord = words[words.length - 1];
-        const restWords = words.slice(0, words.length - 1);
+        const lastWord = g.words.pop();
+        const detectedIds = groupDetectedIds(g);
+        const halfDur = Math.max(0.1, (g.duration || 0.6) / 2);
+        g.duration = halfDur;
 
-        line.groups.splice(groupIdx, 1, {
-            words: restWords,
-            note: group.note,
-            duration: group.duration || 0.6
-        }, {
+        const newGroup = {
             words: [lastWord],
             note: null,
-            duration: 0.6
-        });
+            duration: halfDur,
+            _detectedNoteIds: []
+        };
 
+        line.groups.splice(groupIdx + 1, 0, newGroup);
+        syncDetectedNoteLinks(line);
         updateTextareaFromState();
         renderAll();
     }
 
     function clearAllGroups() {
-        if (!confirm('Ви впевнені, що хочете очистити всі групи та ноти?')) return;
-        const text = lyricsInput.value;
-        const lines = parseTextToLines(text);
-        state.lines = lines.map(line => {
-            if (isLineEmpty(line)) {
-                return { groups: [], isEmpty: true, collapsed: false, detectedNotes: [] };
-            }
-            return {
-                groups: mergePunctuation(wordsFromLine(line)).map(w => ({
-                    words: [w],
-                    note: null
-                })),
-                isEmpty: false,
-                rawText: line,
-                collapsed: false,
-                detectedNotes: []
-            };
-        });
+        lyricsInput.value = '';
+        state.lines = [];
         renderAll();
     }
 
     function updateTextareaFromState() {
-        lyricsInput.value = state.lines.map(line => line.rawText ?? (line.isEmpty ? '' : line.groups.flatMap(g => g.words).join(' '))).join('\n');
+        const fullText = state.lines.map(line => {
+            if (line.isEmpty) return '';
+            if (line.rawText !== undefined) return line.rawText;
+            return line.groups.flatMap(g => g.words).join(' ');
+        }).join('\n');
+
+        lyricsInput.value = fullText;
     }
 
     // ============================================================
-    // 6. RENDER EDIT & PLAYER SCREENS
+    // 8. RENDER FUNCTIONS
     // ============================================================
     function renderGroups() {
-        const container = groupsContainer;
-        if (!state.lines.length || state.lines.every(l => l.isEmpty && !l.draft)) {
-            container.innerHTML = `<div class="empty-state"><span class="big-icon">📝</span>Вставте текст в поле для тексту пісні, щоб створити групи слів</div>`;
+        groupsContainer.innerHTML = '';
+
+        if (!state.lines || state.lines.length === 0) {
+            groupsContainer.innerHTML = '<div class="empty-state">Введіть текст пісні вище, щоб сформувати групи слів</div>';
             groupCount.textContent = '0 груп';
             return;
         }
 
         let totalGroups = 0;
-        let html = '';
-        let displayLineNumber = 0;
 
-        for (let li = 0; li < state.lines.length; li++) {
-            const line = state.lines[li];
-
+        state.lines.forEach((line, lineIdx) => {
             if (line.isEmpty) {
-                html += `<div class="line-block-empty"></div>`;
-                continue;
+                const emptyDiv = document.createElement('div');
+                emptyDiv.className = 'line-block-empty';
+                groupsContainer.appendChild(emptyDiv);
+                return;
             }
 
             totalGroups += line.groups.length;
+
+            const lineBlock = document.createElement('div');
+            lineBlock.className = `line-block ${line.collapsed ? 'collapsed' : ''} ${line.draft ? 'draft' : ''}`;
+            lineBlock.dataset.line = lineIdx;
+
             const lineText = line.rawText ?? line.groups.flatMap(g => g.words).join(' ');
-            if (lineText.trim()) displayLineNumber++;
-            const collapsedClass = line.collapsed ? ' collapsed' : '';
-            const draftClass = line.draft ? ' draft' : '';
 
-            html += `<div class="line-block${collapsedClass}${draftClass}" data-line="${li}">`;
-            html += `<div class="line-block-header" onclick="window.appToggleLine(${li})">`;
-            html += `<button class="collapse-toggle">▼</button>`;
-            html += `<span class="line-number">${displayLineNumber}</span>`;
-            html += `<span class="line-preview">${escapeHtml(lineText)}</span>`;
-            html += `</div>`;
+            const header = document.createElement('div');
+            header.className = 'line-block-header';
+            header.innerHTML = `
+                <button class="collapse-toggle" title="Згорнути/розгорнути">▼</button>
+                <span class="line-number">Рядок ${lineIdx + 1}</span>
+                <span class="line-preview">${escapeHtml(lineText)}</span>
+            `;
 
-            html += `<div class="line-block-body">`;
-            html += `<input type="text" class="line-text-input" data-line="${li}" value="${escapeHtml(lineText)}" placeholder="Рядок тексту..." oninput="window.appLineInput(${li}, this.value)">`;
+            header.addEventListener('click', (e) => {
+                toggleLineCollapsed(lineIdx);
+            });
 
-            if (line.groups.length > 0) {
-                html += `<div class="chips">`;
-                for (let gi = 0; gi < line.groups.length; gi++) {
-                    const group = line.groups[gi];
-                    const displayText = group.words.join(' ');
-                    const note = group.note;
-                    const hasNote = note !== null;
-                    const isLastInLine = gi === line.groups.length - 1;
+            const body = document.createElement('div');
+            body.className = 'line-block-body';
 
-                    html += `<div class="chip" data-line="${li}" data-group="${gi}">`;
-                    html += `<span class="text">${escapeHtml(displayText)}</span>`;
-                    const noteDisplay = hasNote ? note.replace(/\d/, '') : '♩';
-                    html += `<span class="note-badge ${hasNote ? 'has-note' : ''}" title="${hasNote ? escapeHtml(note) : 'Вибрати ноту'}">${noteDisplay}</span>`;
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'line-text-input';
+            input.value = lineText;
+            input.placeholder = 'Введіть рядок тексту…';
+            input.dataset.line = lineIdx;
 
-                    if (!isLastInLine) {
-                        html += `<button class="action-btn merge-btn" data-action="merge" data-line="${li}" data-group="${gi}" title="Об'єднати">+</button>`;
-                    }
-                    if (group.words.length > 1) {
-                        html += `<button class="action-btn split-btn" data-action="split" data-line="${li}" data-group="${gi}" title="Розділити">✂️</button>`;
-                    }
-                    html += `</div>`;
-                }
-                html += `</div>`;
+            input.addEventListener('input', (e) => {
+                const val = removeLatin(e.target.value);
+                e.target.value = val;
+                handleLineTextLiveEdit(lineIdx, val);
+            });
+
+            input.addEventListener('change', (e) => {
+                const val = removeLatin(e.target.value);
+                e.target.value = val;
+                handleLineTextCommit(lineIdx, val);
+            });
+
+            body.appendChild(input);
+
+            const recActions = document.createElement('div');
+            recActions.className = 'record-actions';
+            const isRec = state.recording?.lineIdx === lineIdx;
+            recActions.innerHTML = `
+                <button class="record-line-btn ${isRec ? 'btn-danger' : ''}" data-line="${lineIdx}">
+                    ${isRec ? '⏹ Зупинити запис' : '🎤 Записати рядок'}
+                </button>
+                <span class="record-status ${isRec ? 'recording' : ''}" data-record-status="${lineIdx}">
+                    ${isRec ? 'Запис…' : (line.audioData ? 'Аудіо записано' : '')}
+                </span>
+            `;
+
+            recActions.querySelector('.record-line-btn').addEventListener('click', e => {
+                e.stopPropagation();
+                toggleLineRecording(lineIdx);
+            });
+
+            body.appendChild(recActions);
+
+            if (line.detectedNotes && line.detectedNotes.length > 0) {
+                const visual = document.createElement('div');
+                visual.className = `line-notes-visual ${line.notesCollapsed ? 'notes-collapsed' : ''}`;
+                visual.dataset.line = lineIdx;
+
+                const controls = document.createElement('div');
+                controls.className = 'line-notes-controls';
+                controls.innerHTML = `
+                    <button class="line-notes-toggle" data-line="${lineIdx}">
+                        ${line.notesCollapsed ? 'Показати розпізнані ноти' : 'Сховати розпізнані ноти'}
+                    </button>
+                    <button class="clear-line-notes-btn" data-line="${lineIdx}">
+                        Очистити розпізнані ноти
+                    </button>
+                `;
+
+                controls.querySelector('.line-notes-toggle').addEventListener('click', e => {
+                    e.stopPropagation();
+                    line.notesCollapsed = !line.notesCollapsed;
+                    renderAll();
+                });
+
+                controls.querySelector('.clear-line-notes-btn').addEventListener('click', e => {
+                    e.stopPropagation();
+                    clearDetectedNotes(lineIdx);
+                });
+
+                const strip = document.createElement('div');
+                strip.className = 'line-notes-strip';
+
+                line.detectedNotes.forEach(n => {
+                    const el = document.createElement('div');
+                    el.className = 'detected-note';
+                    el.dataset.noteId = n.id;
+                    el.innerHTML = `${n.note.replace(/\d/, '')}<span class="detected-note-duration">${n.duration.toFixed(1)}s</span>`;
+                    setupDetectedNoteDrag(lineIdx, el, visual);
+                    strip.appendChild(el);
+                });
+
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('class', 'line-notes-connections');
+
+                visual.appendChild(controls);
+                visual.appendChild(strip);
+                visual.appendChild(svg);
+                body.appendChild(visual);
             }
 
-            html += `</div></div>`;
-        }
+            const chips = document.createElement('div');
+            chips.className = 'chips';
 
-        container.innerHTML = html;
+            line.groups.forEach((group, gi) => {
+                const displayText = group.words.join(' ');
+                const note = group.note;
+                const hasNote = note !== null;
+                const isLastInLine = gi === line.groups.length - 1;
+
+                const chip = document.createElement('div');
+                chip.className = 'chip';
+                chip.dataset.line = lineIdx;
+                chip.dataset.group = gi;
+
+                let chipHtml = `<span class="text">${escapeHtml(displayText)}</span>`;
+                const noteDisplay = hasNote ? note.replace(/\d/, '') : '♩';
+                chipHtml += `<span class="note-badge ${hasNote ? 'has-note' : ''}" title="${hasNote ? escapeHtml(note) : 'Тап на слово, щоб вибрати ноту'}">${noteDisplay}</span>`;
+
+                if (!isLastInLine) {
+                    chipHtml += `<button class="action-btn merge-btn" data-action="merge" data-line="${lineIdx}" data-group="${gi}" title="Об'єднати з наступною групою">+</button>`;
+                }
+
+                if (group.words.length > 1) {
+                    chipHtml += `<button class="action-btn split-btn" data-action="split" data-line="${lineIdx}" data-group="${gi}" title="Відокремити останнє слово">✂️</button>`;
+                }
+
+                chip.innerHTML = chipHtml;
+
+                chip.addEventListener('click', (e) => {
+                    if (e.target.closest('.action-btn')) return;
+                    openNotePopup(lineIdx, gi);
+                });
+
+                const mergeBtn = chip.querySelector('[data-action="merge"]');
+                if (mergeBtn) {
+                    mergeBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        mergeGroupWithNext(lineIdx, gi);
+                    });
+                }
+
+                const splitBtn = chip.querySelector('[data-action="split"]');
+                if (splitBtn) {
+                    splitBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        splitGroup(lineIdx, gi);
+                    });
+                }
+
+                chips.appendChild(chip);
+            });
+
+            body.appendChild(chips);
+            lineBlock.appendChild(header);
+            lineBlock.appendChild(body);
+            groupsContainer.appendChild(lineBlock);
+        });
+
         groupCount.textContent = `${totalGroups} груп`;
 
-        // Event Listeners for Dynamic Elements
-        container.querySelectorAll('.chip').forEach(chip => {
-            chip.addEventListener('click', (e) => {
-                if (e.target.closest('.action-btn')) return;
-                openNotePopup(parseInt(chip.dataset.line), parseInt(chip.dataset.group));
-            });
-        });
-
-        container.querySelectorAll('[data-action="merge"]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                mergeGroupWithNext(parseInt(btn.dataset.line), parseInt(btn.dataset.group));
-            });
-        });
-
-        container.querySelectorAll('[data-action="split"]').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                splitGroup(parseInt(btn.dataset.line), parseInt(btn.dataset.group));
+        requestAnimationFrame(() => {
+            state.lines.forEach((line, lineIdx) => {
+                const visual = groupsContainer.querySelector(`.line-notes-visual[data-line="${lineIdx}"]`);
+                if (visual) renderDetectedNoteConnections(lineIdx, visual);
             });
         });
     }
 
-    function renderPlayer() {
-        const container = playerContainer;
-        let totalGroups = 0;
-        let html = '';
+    function renderPlayerScreen() {
+        playerContainer.innerHTML = '';
+        stopLinePlayback();
 
-        for (let li = 0; li < state.lines.length; li++) {
-            const line = state.lines[li];
+        if (!state.lines || state.lines.length === 0) {
+            playerContainer.innerHTML = '<div class="empty-state">Немає груп слів. Створіть їх у редакторі!</div>';
+            playerGroupCount.textContent = '0 груп';
+            return;
+        }
+
+        let totalGroups = 0;
+
+        state.lines.forEach((line, lineIdx) => {
             if (line.isEmpty) {
-                html += `<div class="player-line empty-line"></div>`;
-                continue;
+                const emptyDiv = document.createElement('div');
+                emptyDiv.className = 'player-line empty-line';
+                playerContainer.appendChild(emptyDiv);
+                return;
             }
 
             totalGroups += line.groups.length;
-            html += `<div class="player-line" data-line="${li}">`;
-            html += `<span class="player-line-label">РЯДОК ${li + 1}</span>`;
-            html += `<div class="player-chips">`;
 
-            for (let gi = 0; gi < line.groups.length; gi++) {
-                const group = line.groups[gi];
-                const note = group.note;
-                const noteText = note ? note.replace(/\d/, '') : '';
-                const groupId = getGroupId(li, gi);
+            const lineDiv = document.createElement('div');
+            lineDiv.className = 'player-line';
+            lineDiv.dataset.line = lineIdx;
 
-                html += `<div class="player-chip" data-group-id="${groupId}" data-note="${note || ''}">`;
-                html += `<span>${escapeHtml(group.words.join(' '))}</span>`;
-                if (noteText) html += `<span class="note-label">${noteText}</span>`;
-                html += `</div>`;
-            }
+            const hasNotesInLine = line.groups.some(g => g.note !== null);
 
-            html += `</div></div>`;
-        }
+            const head = document.createElement('div');
+            head.className = 'player-line-head';
 
-        container.innerHTML = html;
-        playerGroupCount.textContent = `${totalGroups} груп`;
+            const playBtn = document.createElement('button');
+            playBtn.className = `player-line-play ${hasNotesInLine ? '' : 'disabled'}`;
+            playBtn.innerHTML = '▶';
+            playBtn.title = hasNotesInLine ? 'Програти рядок' : 'У цьому рядку немає призначених нот';
 
-        container.querySelectorAll('.player-chip').forEach(chip => {
-            const groupId = chip.dataset.groupId;
-            const note = chip.dataset.note;
+            playBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (!hasNotesInLine) return;
 
-            if (!note) return;
-
-            const start = (e) => {
-                e.preventDefault();
-                chip.classList.add('holding');
-                startContinuousNote(note, groupId);
-            };
-
-            const stop = (e) => {
-                e.preventDefault();
-                chip.classList.remove('holding');
-                stopContinuousNote(groupId);
-            };
-
-            chip.addEventListener('mousedown', start);
-            chip.addEventListener('mouseup', stop);
-            chip.addEventListener('mouseleave', stop);
-
-            chip.addEventListener('touchstart', start, { passive: false });
-            chip.addEventListener('touchend', stop);
-            chip.addEventListener('touchcancel', stop);
-        });
-    }
-
-    function renderAll() {
-        renderGroups();
-        if (state.currentTab === 'player') renderPlayer();
-    }
-
-    // Global helper functions attached to window for HTML handlers
-    window.appToggleLine = function(lineIdx) {
-        if (state.lines[lineIdx]) {
-            state.lines[lineIdx].collapsed = !state.lines[lineIdx].collapsed;
-            renderAll();
-        }
-    };
-
-    window.appLineInput = function(lineIdx, value) {
-        handleLineTextLiveEdit(lineIdx, value);
-    };
-
-    // ============================================================
-    // 7. NOTE POPUP & SELECTION
-    // ============================================================
-    function buildNoteGrid() {
-        let html = '';
-        const octaves = ['3', '4', '5'];
-
-        octaves.forEach(oct => {
-            html += `<div class="octave-label">Октава ${oct}</div>`;
-            html += `<div class="octave-row">`;
-            state.notes.filter(n => n.endsWith(oct)).forEach(note => {
-                const display = note.replace(/\d/, '');
-                html += `<button class="note-btn" data-note="${note}">${display}</button>`;
-            });
-            html += `</div>`;
-        });
-
-        noteGrid.innerHTML = html;
-
-        noteGrid.querySelectorAll('.note-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const note = btn.dataset.note;
-                if (state.editing) {
-                    setGroupNote(state.editing.lineIdx, state.editing.groupIdx, note);
-                    closeNotePopup();
+                if (state.playerPlayback.playing && state.playerPlayback.lineIdx === lineIdx) {
+                    stopLinePlayback();
+                } else {
+                    startLinePlayback(lineIdx);
                 }
             });
+
+            const labelSpan = document.createElement('span');
+            labelSpan.className = 'player-line-label';
+            labelSpan.style.margin = '0';
+            labelSpan.textContent = `РЯДОК ${lineIdx + 1}`;
+
+            head.appendChild(playBtn);
+            head.appendChild(labelSpan);
+            lineDiv.appendChild(head);
+
+            const isExpanded = state.playerPlayback.expanded === lineIdx;
+            if (isExpanded) {
+                const playerPanel = document.createElement('div');
+                playerPanel.className = 'player-line-player';
+
+                const track = document.createElement('div');
+                track.className = 'player-track';
+                track.innerHTML = `
+                    <div class="player-track-progress" id="player-progress-${lineIdx}"></div>
+                    <div class="player-track-dot" id="player-dot-${lineIdx}"></div>
+                `;
+
+                const timeDiv = document.createElement('div');
+                timeDiv.className = 'player-time';
+                timeDiv.innerHTML = `
+                    <span id="player-cur-time-${lineIdx}">0:00</span>
+                    <span id="player-dur-time-${lineIdx}">0:00</span>
+                `;
+
+                const tools = document.createElement('div');
+                tools.className = 'player-tools';
+
+                const pBtn = document.createElement('button');
+                pBtn.className = 'player-mini-btn';
+                pBtn.textContent = state.playerPlayback.playing ? '⏸' : '▶';
+                pBtn.addEventListener('click', () => {
+                    if (state.playerPlayback.playing) pauseLinePlayback();
+                    else resumeLinePlayback();
+                });
+
+                const stopBtn = document.createElement('button');
+                stopBtn.className = 'player-mini-btn';
+                stopBtn.textContent = '⏹';
+                stopBtn.addEventListener('click', () => stopLinePlayback());
+
+                const speedDiv = document.createElement('div');
+                speedDiv.className = 'player-speed';
+                speedDiv.innerHTML = `
+                    <span>Швидкість: <b id="speed-val-${lineIdx}">${state.playerPlayback.speed}x</b></span>
+                    <input type="range" min="0.5" max="2" step="0.1" value="${state.playerPlayback.speed}">
+                `;
+
+                const speedInput = speedDiv.querySelector('input');
+                speedInput.addEventListener('input', (e) => {
+                    const speed = parseFloat(e.target.value);
+                    state.playerPlayback.speed = speed;
+                    const spVal = $('speed-val-' + lineIdx);
+                    if (spVal) spVal.textContent = `${speed}x`;
+                });
+
+                tools.appendChild(pBtn);
+                tools.appendChild(stopBtn);
+                tools.appendChild(speedDiv);
+
+                playerPanel.appendChild(track);
+                playerPanel.appendChild(timeDiv);
+                playerPanel.appendChild(tools);
+
+                lineDiv.appendChild(playerPanel);
+            }
+
+            const chipsDiv = document.createElement('div');
+            chipsDiv.className = 'player-chips';
+            chipsDiv.style.marginTop = '8px';
+
+            line.groups.forEach((group, gi) => {
+                const text = group.words.join(' ');
+                const note = group.note;
+                const hasNote = note !== null;
+
+                const pChip = document.createElement('div');
+                pChip.className = 'player-chip';
+                pChip.dataset.line = lineIdx;
+                pChip.dataset.group = gi;
+
+                let chipInner = `<span>${escapeHtml(text)}</span>`;
+                if (hasNote) {
+                    chipInner += `<span class="note-label">${escapeHtml(note)}</span>`;
+                }
+
+                pChip.innerHTML = chipInner;
+
+                const groupId = `${lineIdx}-${gi}`;
+
+                const handlePressStart = (e) => {
+                    e.preventDefault();
+                    if (!hasNote) return;
+
+                    pChip.classList.add('holding');
+                    state.holdingId = groupId;
+                    startContinuousNote(note, groupId);
+                };
+
+                const handlePressEnd = (e) => {
+                    if (!hasNote) return;
+
+                    pChip.classList.remove('holding');
+                    if (state.holdingId === groupId) {
+                        stopContinuousNote(groupId);
+                        state.holdingId = null;
+                    }
+                };
+
+                pChip.addEventListener('mousedown', handlePressStart);
+                pChip.addEventListener('mouseup', handlePressEnd);
+                pChip.addEventListener('mouseleave', handlePressEnd);
+
+                pChip.addEventListener('touchstart', handlePressStart, { passive: false });
+                pChip.addEventListener('touchend', handlePressEnd);
+                pChip.addEventListener('touchcancel', handlePressEnd);
+
+                chipsDiv.appendChild(pChip);
+            });
+
+            lineDiv.appendChild(chipsDiv);
+            playerContainer.appendChild(lineDiv);
+        });
+
+        playerGroupCount.textContent = `${totalGroups} груп`;
+    }
+
+    // ============================================================
+    // 9. PLAYER SCREEN AUTOMATIC PLAYBACK
+    // ============================================================
+    function calculateLineDuration(lineIdx) {
+        const line = state.lines[lineIdx];
+        if (!line || line.isEmpty) return 0;
+        return line.groups.reduce((sum, g) => sum + (g.note ? (g.duration || 0.6) : 0.3), 0);
+    }
+
+    function formatTime(sec) {
+        const m = Math.floor(sec / 60);
+        const s = Math.floor(sec % 60);
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    function startLinePlayback(lineIdx) {
+        stopLinePlayback();
+
+        const line = state.lines[lineIdx];
+        if (!line || line.isEmpty) return;
+
+        state.playerPlayback.lineIdx = lineIdx;
+        state.playerPlayback.playing = true;
+        state.playerPlayback.expanded = lineIdx;
+        state.playerPlayback.elapsed = 0;
+        state.playerPlayback.startedAt = performance.now();
+
+        renderPlayerScreen();
+
+        const totalDur = calculateLineDuration(lineIdx);
+        const durEl = $(`player-dur-time-${lineIdx}`);
+        if (durEl) durEl.textContent = formatTime(totalDur);
+
+        const lineEl = playerContainer.querySelector(`.player-line[data-line="${lineIdx}"]`);
+        if (lineEl) lineEl.classList.add('playing-line');
+
+        scheduleNextGroupNote();
+        updatePlaybackUI();
+    }
+
+    function scheduleNextGroupNote() {
+        if (!state.playerPlayback.playing) return;
+
+        const lineIdx = state.playerPlayback.lineIdx;
+        const line = state.lines[lineIdx];
+        if (!line) return;
+
+        let currentTime = 0;
+
+        for (let gi = 0; gi < line.groups.length; gi++) {
+            const group = line.groups[gi];
+            const dur = group.note ? (group.duration || 0.6) : 0.3;
+            const scaledDur = dur / state.playerPlayback.speed;
+
+            if (currentTime + scaledDur > state.playerPlayback.elapsed) {
+                const delay = Math.max(0, (currentTime - state.playerPlayback.elapsed) * 1000);
+
+                state.playerPlayback.timer = setTimeout(() => {
+                    if (!state.playerPlayback.playing) return;
+
+                    playerContainer.querySelectorAll('.player-chip').forEach(c => c.classList.remove('playing-group'));
+                    const chip = playerContainer.querySelector(`.player-chip[data-line="${lineIdx}"][data-group="${gi}"]`);
+                    if (chip) chip.classList.add('playing-group');
+
+                    if (group.note) {
+                        playNote(group.note, dur / state.playerPlayback.speed);
+                    }
+
+                    state.playerPlayback.timer = setTimeout(() => {
+                        if (chip) chip.classList.remove('playing-group');
+                    }, scaledDur * 1000);
+
+                }, delay);
+
+                break;
+            }
+
+            currentTime += scaledDur;
+        }
+    }
+
+    function updatePlaybackUI() {
+        if (!state.playerPlayback.playing) return;
+
+        const lineIdx = state.playerPlayback.lineIdx;
+        const totalDur = calculateLineDuration(lineIdx) / state.playerPlayback.speed;
+
+        const now = performance.now();
+        const delta = (now - state.playerPlayback.startedAt) / 1000;
+        state.playerPlayback.elapsed += delta;
+        state.playerPlayback.startedAt = now;
+
+        if (state.playerPlayback.elapsed >= totalDur) {
+            stopLinePlayback();
+            return;
+        }
+
+        const pct = Math.min(100, (state.playerPlayback.elapsed / totalDur) * 100);
+
+        const progressEl = $(`player-progress-${lineIdx}`);
+        const dotEl = $(`player-dot-${lineIdx}`);
+        const curTimeEl = $(`player-cur-time-${lineIdx}`);
+
+        if (progressEl) progressEl.style.width = `${pct}%`;
+        if (dotEl) dotEl.style.left = `${pct}%`;
+        if (curTimeEl) curTimeEl.textContent = formatTime(state.playerPlayback.elapsed * state.playerPlayback.speed);
+
+        state.playerPlayback.raf = requestAnimationFrame(updatePlaybackUI);
+    }
+
+    function pauseLinePlayback() {
+        if (!state.playerPlayback.playing) return;
+        state.playerPlayback.playing = false;
+        clearTimeout(state.playerPlayback.timer);
+        cancelAnimationFrame(state.playerPlayback.raf);
+        renderPlayerScreen();
+    }
+
+    function resumeLinePlayback() {
+        if (state.playerPlayback.lineIdx === null) return;
+        state.playerPlayback.playing = true;
+        state.playerPlayback.startedAt = performance.now();
+        scheduleNextGroupNote();
+        updatePlaybackUI();
+        renderPlayerScreen();
+    }
+
+    function stopLinePlayback() {
+        clearTimeout(state.playerPlayback.timer);
+        cancelAnimationFrame(state.playerPlayback.raf);
+
+        if (state.playerPlayback.lineIdx !== null) {
+            const lineEl = playerContainer.querySelector(`.player-line[data-line="${state.playerPlayback.lineIdx}"]`);
+            if (lineEl) lineEl.classList.remove('playing-line');
+        }
+
+        state.playerPlayback.playing = false;
+        state.playerPlayback.lineIdx = null;
+        state.playerPlayback.expanded = null;
+        state.playerPlayback.elapsed = 0;
+
+        playerContainer.querySelectorAll('.player-chip').forEach(c => c.classList.remove('playing-group'));
+
+        renderPlayerScreen();
+    }
+
+    // ============================================================
+    // 10. NOTE POPUP & SELECTION
+    // ============================================================
+    function renderNoteGrid() {
+        noteGrid.innerHTML = '';
+
+        const octaves = [
+            { name: 'Мала октава (3)', notes: state.notes.slice(0, 12) },
+            { name: 'Перша октава (4)', notes: state.notes.slice(12, 24) },
+            { name: 'Друга октава (5)', notes: state.notes.slice(24, 36) }
+        ];
+
+        octaves.forEach(oct => {
+            const label = document.createElement('div');
+            label.className = 'octave-label';
+            label.textContent = oct.name;
+            noteGrid.appendChild(label);
+
+            const row = document.createElement('div');
+            row.className = 'octave-row';
+
+            oct.notes.forEach(note => {
+                const btn = document.createElement('button');
+                btn.className = `note-btn ${state.tempNote === note ? 'selected' : ''}`;
+                btn.textContent = note.replace(/\d/, '');
+                btn.dataset.note = note;
+
+                btn.addEventListener('click', () => {
+                    state.tempNote = note;
+                    playNoteOnce(note);
+
+                    noteGrid.querySelectorAll('.note-btn').forEach(b => b.classList.remove('selected'));
+                    btn.classList.add('selected');
+
+                    setTimeout(() => {
+                        applySelectedNote();
+                    }, 180);
+                });
+
+                row.appendChild(btn);
+            });
+
+            noteGrid.appendChild(row);
         });
     }
 
     function openNotePopup(lineIdx, groupIdx) {
-        state.editing = { lineIdx, groupIdx };
-        const group = getGroup(lineIdx, groupIdx);
-        const currentNote = group ? group.note : null;
+        state.editing = { type: 'group', lineIdx, groupIdx };
+        const g = getGroup(lineIdx, groupIdx);
+        state.tempNote = g ? g.note : null;
 
-        noteGrid.querySelectorAll('.note-btn').forEach(btn => {
-            if (btn.dataset.note === currentNote) btn.classList.add('selected');
-            else btn.classList.remove('selected');
-        });
-
+        renderNoteGrid();
         notePopup.classList.add('open');
     }
 
     function closeNotePopup() {
         notePopup.classList.remove('open');
         state.editing = null;
+        state.tempNote = null;
     }
 
-    popupClose.addEventListener('click', closeNotePopup);
-    popupRemoveNote.addEventListener('click', () => {
-        if (state.editing) {
+    function applySelectedNote() {
+        if (!state.editing) return;
+        if (state.editing.type === 'detected') {
+            const line = state.lines[state.editing.lineIdx];
+            const item = line?.detectedNotes?.find(n => n.id === state.editing.noteId);
+            if (item && state.tempNote) {
+                item.note = state.tempNote;
+                (item.groupIdxs || []).forEach(gi => {
+                    const g = line.groups[gi];
+                    if (g) g.note = state.tempNote;
+                });
+                playNoteOnce(state.tempNote);
+                renderAll();
+            }
+        } else {
+            setGroupNote(state.editing.lineIdx, state.editing.groupIdx, state.tempNote);
+        }
+        closeNotePopup();
+    }
+
+    function removeSelectedNote() {
+        if (!state.editing) return;
+        if (state.editing.type === 'detected') {
+            detachDetectedNote(state.editing.lineIdx, state.editing.noteId);
+        } else {
             setGroupNote(state.editing.lineIdx, state.editing.groupIdx, null);
-            closeNotePopup();
         }
-    });
+        closeNotePopup();
+    }
 
     // ============================================================
-    // 8. EVENT LISTENERS
+    // 11. SHARING & URL STATE
     // ============================================================
-    lyricsInput.addEventListener('input', (e) => {
-        const text = e.target.value;
-        const cleaned = removeLatin(text);
-        if (cleaned !== text) {
-            lyricsInput.value = cleaned;
+    function serializeState() {
+        const compact = {
+            v: 1,
+            l: state.lines.map(line => ({
+                e: line.isEmpty ? 1 : 0,
+                r: line.rawText || '',
+                g: line.groups.map(g => [g.words, g.note, g.duration || 0.6, groupDetectedIds(g)])
+            }))
+        };
+        const json = JSON.stringify(compact);
+        return LZString.compressToEncodedURIComponent(json);
+    }
+
+    function deserializeState(hash) {
+        try {
+            const json = LZString.decompressFromEncodedURIComponent(hash);
+            if (!json) return false;
+            const data = JSON.parse(json);
+            if (data && data.l) {
+                state.lines = data.l.map(line => {
+                    if (line.e) return { groups: [], isEmpty: true, rawText: line.r || '' };
+                    return {
+                        isEmpty: false,
+                        rawText: line.r || '',
+                        groups: line.g.map(g => ({
+                            words: g[0],
+                            note: g[1],
+                            duration: g[2] || 0.6,
+                            _detectedNoteIds: Array.isArray(g[3]) ? g[3] : []
+                        }))
+                    };
+                });
+                updateTextareaFromState();
+                renderAll();
+                return true;
+            }
+        } catch (e) {
+            console.error('Failed to parse share URL:', e);
         }
-        clearTimeout(state.debounceTimer);
-        state.debounceTimer = setTimeout(() => {
-            rebuildGroupsPreservingNotes(cleaned);
-            renderAll();
-        }, 150);
-    });
+        return false;
+    }
 
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const tab = btn.dataset.tab;
-            tabBtns.forEach(b => b.classList.toggle('active', b === btn));
-            Object.keys(screens).forEach(s => screens[s].classList.toggle('active', s === tab));
-            state.currentTab = tab;
-            if (tab === 'player') renderPlayer();
-        });
-    });
+    function copyShareLink() {
+        const hash = serializeState();
+        const url = `${window.location.origin}${window.location.pathname}#${hash}`;
 
-    document.querySelectorAll('.instrument-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const inst = btn.dataset.instrument;
-            document.querySelectorAll('.instrument-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            await loadInstrument(inst);
-        });
-    });
-
-    volumeSlider.addEventListener('input', (e) => {
-        state.volume = parseInt(e.target.value, 10) / 100;
-        volValue.textContent = `${e.target.value}%`;
-        updateMasterVolume();
-    });
-
-    toggleNotes.addEventListener('change', (e) => {
-        playerContainer.classList.toggle('notes-visible', e.target.checked);
-    });
-
-    addLineBtn.addEventListener('click', addEmptyLine);
-    clearGroupsBtn.addEventListener('click', clearAllGroups);
-
-    backToEditorBtn.addEventListener('click', () => {
-        tabBtns[0].click();
-    });
-
-    shareFromPlayerBtn.addEventListener('click', () => {
-        const data = JSON.stringify(state.lines);
-        const compressed = LZString.compressToEncodedURIComponent(data);
-        const url = `${location.origin}${location.pathname}#song=${compressed}`;
         navigator.clipboard.writeText(url).then(() => {
             shareNotif.classList.add('show');
-            setTimeout(() => shareNotif.classList.remove('show'), 2500);
+            setTimeout(() => {
+                shareNotif.classList.remove('show');
+            }, 2500);
+        }).catch(() => {
+            prompt('Скопіюйте посилання вручну:', url);
         });
-    });
-
-    // Load state from Hash if exists
-    function loadFromHash() {
-        const hash = location.hash;
-        if (hash.startsWith('#song=')) {
-            try {
-                const compressed = hash.replace('#song=', '');
-                const json = LZString.decompressFromEncodedURIComponent(compressed);
-                if (json) {
-                    state.lines = JSON.parse(json);
-                    updateTextareaFromState();
-                }
-            } catch (e) {
-                console.error('Failed to parse URL hash:', e);
-            }
-        }
     }
 
     // ============================================================
-    // INITIALIZATION
+    // 12. TAB NAVIGATION & GENERAL RENDER
     // ============================================================
+    function switchTab(tabName) {
+        state.currentTab = tabName;
+
+        tabBtns.forEach(btn => {
+            if (btn.dataset.tab === tabName) btn.classList.add('active');
+            else btn.classList.remove('active');
+        });
+
+        Object.keys(screens).forEach(key => {
+            if (key === tabName) screens[key].classList.add('active');
+            else screens[key].classList.remove('active');
+        });
+
+        if (tabName === 'player') {
+            renderPlayerScreen();
+        } else {
+            stopLinePlayback();
+            renderGroups();
+        }
+    }
+
+    function renderAll() {
+        if (state.currentTab === 'editor') {
+            renderGroups();
+        } else {
+            renderPlayerScreen();
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // ============================================================
+    // 13. EVENT LISTENERS & INIT
+    // ============================================================
+    function initEvents() {
+        lyricsInput.addEventListener('input', (e) => {
+            clearTimeout(state.debounceTimer);
+            const rawVal = e.target.value;
+            const cleanedVal = removeLatin(rawVal);
+
+            if (rawVal !== cleanedVal) {
+                const start = e.target.selectionStart;
+                const end = e.target.selectionEnd;
+                const diff = rawVal.length - cleanedVal.length;
+                e.target.value = cleanedVal;
+                e.target.setSelectionRange(Math.max(0, start - diff), Math.max(0, end - diff));
+            }
+
+            state.debounceTimer = setTimeout(() => {
+                rebuildGroupsPreservingNotes(e.target.value);
+                renderAll();
+            }, 120);
+        });
+
+        $('add-line-btn').addEventListener('click', () => {
+            addEmptyLine();
+        });
+
+        clearGroupsBtn.addEventListener('click', () => {
+            if (confirm('Дійсно очистити весь текст та ноти?')) {
+                clearAllGroups();
+            }
+        });
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                switchTab(btn.dataset.tab);
+            });
+        });
+
+        backToEditorBtn.addEventListener('click', () => {
+            switchTab('editor');
+        });
+
+        shareFromPlayerBtn.addEventListener('click', () => {
+            copyShareLink();
+        });
+
+        popupClose.addEventListener('click', closeNotePopup);
+        popupRemoveNote.addEventListener('click', removeSelectedNote);
+
+        notePopup.addEventListener('click', (e) => {
+            if (e.target === notePopup) closeNotePopup();
+        });
+
+        volumeSlider.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value, 10);
+            state.volume = val / 100;
+
+            volValue.textContent = `${val}%`;
+            if (val === 0) volIcon.textContent = '🔇';
+            else if (val < 50) volIcon.textContent = '🔉';
+            else volIcon.textContent = '🔊';
+
+            updateMasterVolume();
+        });
+
+        toggleNotes.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                playerContainer.classList.add('notes-visible');
+            } else {
+                playerContainer.classList.remove('notes-visible');
+            }
+        });
+
+        document.querySelectorAll('.instrument-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const inst = btn.dataset.instrument;
+                if (state.instrument === inst) return;
+
+                document.querySelectorAll('.instrument-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+
+                state.instrument = inst;
+                state.instrumentLoaded = false;
+
+                try {
+                    await loadInstrument(inst);
+                } catch (e) {
+                    console.error('Failed to load instrument:', e);
+                }
+            });
+        });
+
+        window.addEventListener('resize', () => {
+            if (state.currentTab === 'editor') {
+                state.lines.forEach((line, lineIdx) => {
+                    const visual = groupsContainer.querySelector(`.line-notes-visual[data-line="${lineIdx}"]`);
+                    if (visual) renderDetectedNoteConnections(lineIdx, visual);
+                });
+            }
+        });
+    }
+
     function init() {
-        buildNoteGrid();
-        loadFromHash();
-        loadInstrument(state.instrument);
-        updateMasterVolume();
+        initEvents();
+
+        if (window.location.hash && window.location.hash.length > 1) {
+            const hash = window.location.hash.substring(1);
+            if (deserializeState(hash)) {
+                console.log('✅ Данні успішно завантажено з посилання');
+            }
+        }
+
+        loadInstrument('acoustic_grand_piano').catch(console.error);
+
         renderAll();
     }
 
