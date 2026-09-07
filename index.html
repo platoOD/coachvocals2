@@ -247,6 +247,7 @@
             background: var(--accent);
         }
 
+        /* Notes are hidden by default in the "Вправа" screen until toggled on */
         #player-container:not(.notes-visible) .note-label {
             display: none;
         }
@@ -902,6 +903,7 @@
             filter: drop-shadow(0 0 16px rgba(52, 229, 192, 0.25));
         }
 
+        /* Player styles */
         .player-controls {
             display: flex;
             align-items: center;
@@ -1071,6 +1073,8 @@
             font-weight: 600;
         }
 
+
+        /* Player line playback */
         #player-screen { user-select: none; -webkit-user-select: none; }
         #player-screen input, #player-screen button { user-select: none; -webkit-user-select: none; }
         .player-line { border: 1px solid transparent; border-radius: 14px; padding: 8px; transition: background .2s, border-color .2s; }
@@ -1099,6 +1103,7 @@
         .line-audio-badge { font-size:11px; color:var(--accent); opacity:.9; }
         .line-block.draft .line-number { color:var(--accent); border-color:var(--accent); }
 
+        /* Loading indicator */
         .loading-spinner {
             display: inline-block;
             width: 16px;
@@ -1126,6 +1131,8 @@
                 padding-right: 8px;
             }
 
+            /* Compact the three outer editor gaps on mobile.
+               Internal padding of line blocks and groups stays unchanged. */
             .editor-section {
                 margin-bottom: 8px;
             }
@@ -1242,6 +1249,7 @@
             }
         }
     </style>
+
 </head>
 <body>
 
@@ -1354,7 +1362,7 @@
 <div class="share-notification" id="share-notification">✅ Посилання скопійовано!</div>
 
 <!-- Soundfont library -->
-<script src="https://cdn.jsdelivr.net/npm/soundfont-player@0.12.0/dist/soundfont-player.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.9.17/Tone.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
 
 <script>
@@ -1374,7 +1382,8 @@
         currentTab: 'editor',
         instrument: 'acoustic_grand_piano',
         instrumentLoaded: false,
-        soundfont: null,
+        sampler: null,
+        samplerLoading: null,
         activeNotes: new Map(), // For continuous playback
         volume: 1.0,
         recording: null,
@@ -1384,12 +1393,14 @@
             'C4','C#4','D4','D#4','E4','F4','F#4','G4','G#4','A4','A#4','H4',
             'C5','C#5','D5','D#5','E5','F5','F#5','G5','G#5','A5','A#5','H5'
         ],
-        // Map European H to B for Soundfont
+        // Map European H to B for Tone.js
         noteMap: {
             'H3': 'B3', 'H4': 'B4', 'H5': 'B5'
         }
     };
 
+    // Icon + display label per instrument (used both for the initial buttons
+    // and for refreshing button contents after a Tone.Sampler finishes loading)
     const INSTRUMENTS = {
         acoustic_grand_piano: { icon: '🎹', label: 'Піаніно' },
         violin: { icon: '🎻', label: 'Скрипка' },
@@ -1428,65 +1439,101 @@
     };
 
     // ============================================================
-    // 3. AUDIO ENGINE with Soundfont
+    // 3. AUDIO ENGINE with Tone.Sampler
     // ============================================================
     function getAudioCtx() {
-        if (!state.audioCtx) {
-            state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
+        if (!state.audioCtx) state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         return state.audioCtx;
     }
 
     function getMasterGain() {
         const ctx = getAudioCtx();
-
         if (!state.masterGain) {
             state.masterGain = ctx.createGain();
-            state.masterGain.gain.value = state.volume * 2.0;
-
+            state.masterGain.gain.value = state.volume * 20.0;
             const limiter = ctx.createDynamicsCompressor();
             limiter.threshold.value = -3;
             limiter.knee.value = 5;
             limiter.ratio.value = 20;
             limiter.attack.value = 0.001;
             limiter.release.value = 0.12;
-
             state.masterGain.connect(limiter);
             limiter.connect(ctx.destination);
         }
-
         return state.masterGain;
     }
-    
-    function getSoundfontNote(note) {
+
+    function getToneNote(note) {
         return state.noteMap[note] || note;
     }
 
+    const TONE_INSTRUMENTS = {
+        acoustic_grand_piano: {
+            baseUrl: 'https://tonejs.github.io/audio/salamander/',
+            urls: { A1:'A1.mp3', C2:'C2.mp3', Ds2:'Ds2.mp3', Fs2:'Fs2.mp3', A2:'A2.mp3', C3:'C3.mp3', Ds3:'Ds3.mp3', Fs3:'Fs3.mp3', A3:'A3.mp3', C4:'C4.mp3', Ds4:'Ds4.mp3', Fs4:'Fs4.mp3', A4:'A4.mp3', C5:'C5.mp3', Ds5:'Ds5.mp3', Fs5:'Fs5.mp3', A5:'A5.mp3', C6:'C6.mp3', Ds6:'Ds6.mp3', Fs6:'Fs6.mp3', A6:'A6.mp3', C7:'C7.mp3' }
+        },
+        violin: {
+            baseUrl: 'https://raw.githubusercontent.com/nbrosowsky/tonejs-instruments/master/samples/violin/',
+            urls: { G3:'G3.mp3', A3:'A3.mp3', C4:'C4.mp3', E4:'E4.mp3', G4:'G4.mp3', A4:'A4.mp3', C5:'C5.mp3', E5:'E5.mp3', G5:'G5.mp3', A5:'A5.mp3', C6:'C6.mp3', E6:'E6.mp3', G6:'G6.mp3', A6:'A6.mp3' }
+        },
+        trumpet: {
+            baseUrl: 'https://raw.githubusercontent.com/nbrosowsky/tonejs-instruments/master/samples/trumpet/',
+            urls: { F3:'F3.mp3', C4:'C4.mp3', F4:'F4.mp3', As4:'As4.mp3', G4:'G4.mp3', D5:'D5.mp3', F5:'F5.mp3', A5:'A5.mp3', C6:'C6.mp3' }
+        },
+        acoustic_guitar_steel: {
+            baseUrl: 'https://raw.githubusercontent.com/nbrosowsky/tonejs-instruments/master/samples/guitar-acoustic/',
+            urls: { A2:'A2.mp3', As2:'As2.mp3', A3:'A3.mp3', As3:'As3.mp3', A4:'A4.mp3', As4:'As4.mp3' }
+        },
+        acoustic_bass: {
+            baseUrl: 'https://raw.githubusercontent.com/nbrosowsky/tonejs-instruments/master/samples/contrabass/',
+            urls: { G1:'G1.mp3', As1:'As1.mp3', E2:'E2.mp3', A2:'A2.mp3', D2:'D2.mp3', Fs2:'Fs2.mp3', Gs2:'Gs2.mp3', E3:'E3.mp3', Cs3:'Cs3.mp3', Gs3:'Gs3.mp3', B3:'B3.mp3' }
+        }
+    };
+
+    function getVolumeDb() {
+        return state.volume <= 0 ? -Infinity : -30 + state.volume * 30;
+    }
+
+    async function ensureToneStarted() {
+        try { await Tone.start(); } catch (e) { console.warn('Tone.start:', e); }
+    }
+
     function loadInstrument(instrumentName) {
-        return new Promise((resolve, reject) => {
-            const ctx = getAudioCtx();
-            
-            if (instrumentName === 'sine') {
-                state.instrumentLoaded = true;
-                state.soundfont = null;
-                resolve();
-                return;
+        if (instrumentName === 'sine') {
+            if (state.sampler) { try { state.sampler.dispose(); } catch (e) {} }
+            state.sampler = null;
+            state.samplerLoading = null;
+            state.instrumentLoaded = true;
+            return Promise.resolve();
+        }
+        if (state.sampler && state.instrumentLoaded) return Promise.resolve(state.sampler);
+        if (state.samplerLoading) return state.samplerLoading;
+
+        const config = TONE_INSTRUMENTS[instrumentName] || TONE_INSTRUMENTS.acoustic_grand_piano;
+        stopAllContinuous();
+        if (state.sampler) { try { state.sampler.dispose(); } catch (e) {} }
+        state.sampler = null;
+        state.instrumentLoaded = false;
+
+        document.querySelectorAll('.instrument-btn').forEach(btn => {
+            if (btn.dataset.instrument === instrumentName) {
+                btn.classList.add('loading');
+                btn.innerHTML = `<span class="loading-spinner"></span> <span class="label">Завантаження...</span>`;
             }
+        });
 
-            document.querySelectorAll('.instrument-btn').forEach(btn => {
-                if (btn.dataset.instrument === instrumentName) {
-                    btn.classList.add('loading');
-                    btn.innerHTML = `<span class="loading-spinner"></span> <span class="label">Завантаження...</span>`;
-                }
-            });
-
-            Soundfont.instrument(ctx, instrumentName, {
-                gain: 1.6,
-                destination: getMasterGain()
-            }).then((instrument) => {
-                state.soundfont = instrument;
+        state.samplerLoading = (async () => {
+            try {
+                const sampler = new Tone.Sampler({
+                    urls: config.urls,
+                    baseUrl: config.baseUrl,
+                    attack: 0,
+                    release: 0.08
+                }).toDestination();
+                sampler.volume.value = getVolumeDb();
+                await Tone.loaded();
+                state.sampler = sampler;
                 state.instrumentLoaded = true;
-                
                 document.querySelectorAll('.instrument-btn').forEach(btn => {
                     btn.classList.remove('loading');
                     if (btn.dataset.instrument === instrumentName) {
@@ -1494,86 +1541,54 @@
                         btn.innerHTML = `${meta.icon} <span class="label">${meta.label}</span>`;
                     }
                 });
-                
-                console.log(`✅ Інструмент "${instrumentName}" завантажено`);
-                resolve();
-            }).catch((err) => {
-                console.error('❌ Помилка завантаження інструменту:', err);
-                state.soundfont = null;
+                console.log(`✅ Інструмент "${instrumentName}" завантажено через Tone.Sampler`);
+                return sampler;
+            } catch (err) {
+                state.sampler = null;
                 state.instrumentLoaded = true;
-                
-                document.querySelectorAll('.instrument-btn').forEach(btn => {
-                    btn.classList.remove('loading');
-                });
-                
-                reject(err);
-            });
-        });
+                document.querySelectorAll('.instrument-btn').forEach(btn => btn.classList.remove('loading'));
+                console.error('❌ Помилка завантаження Tone.Sampler:', err);
+                throw err;
+            } finally {
+                state.samplerLoading = null;
+            }
+        })();
+        return state.samplerLoading;
     }
 
     const NOTE_PREVIEW_DURATION = 0.5;
 
-    function playSoundfontNote(noteName, duration = NOTE_PREVIEW_DURATION) {
-        const ctx = getAudioCtx();
-        if (ctx.state === 'suspended') ctx.resume();
-
-        if (state.instrument === 'sine' || !state.soundfont) {
+    function playSamplerNote(noteName, duration = NOTE_PREVIEW_DURATION) {
+        if (!state.sampler || !state.instrumentLoaded) {
             playOscillatorNote(noteName, duration);
             return;
         }
-
         try {
-            const sfNote = getSoundfontNote(noteName);
-            const note = state.soundfont.play(sfNote, 0, duration, {
-                gain: 1.4,
-                release: 0.15
-            });
-            if (note && typeof note.stop === 'function') {
-                const hardStopMs = Math.min(duration * 1000 + 150, 1000);
-                setTimeout(() => {
-                    try { note.stop(); } catch (e) {}
-                }, hardStopMs);
-            }
-            return note;
+            ensureToneStarted();
+            state.sampler.triggerAttackRelease(getToneNote(noteName), Math.max(0.03, duration));
         } catch (e) {
-            console.warn('Soundfont playback error, using oscillator:', e);
+            console.warn('Tone.Sampler playback error:', e);
             playOscillatorNote(noteName, duration);
         }
     }
 
-    function playContinuousSoundfontNote(noteName, groupId) {
-        const ctx = getAudioCtx();
-        if (ctx.state === 'suspended') ctx.resume();
-
-        stopContinuousNote(groupId);
-
-        if (state.instrument === 'sine' || !state.soundfont) {
+    function startContinuousSamplerNote(noteName, groupId) {
+        if (!state.sampler || !state.instrumentLoaded) {
             const result = createOscillatorNode(noteName, true);
-            if (result) {
-                state.activeNotes.set(groupId, result);
-            }
+            if (result) state.activeNotes.set(groupId, result);
             return;
         }
-
         try {
-            const sfNote = getSoundfontNote(noteName);
-            const note = state.soundfont.play(sfNote, 0, undefined, {
-                gain: 1.2
-            });
-
+            ensureToneStarted();
+            const toneNote = getToneNote(noteName);
+            state.sampler.triggerAttack(toneNote);
             state.activeNotes.set(groupId, {
-                type: 'soundfont',
-                note: note,
-                stop: () => {
-                    try { note.stop(); } catch (e) {}
-                }
+                note: toneNote,
+                stop: () => { try { state.sampler?.triggerRelease(toneNote); } catch (e) {} }
             });
         } catch (e) {
-            console.warn('Continuous soundfont error, using oscillator:', e);
             const result = createOscillatorNode(noteName, true);
-            if (result) {
-                state.activeNotes.set(groupId, result);
-            }
+            if (result) state.activeNotes.set(groupId, result);
         }
     }
 
@@ -1654,6 +1669,11 @@
     // ============================================================
     // 5. MAIN AUDIO FUNCTIONS
     // ============================================================
+    // Contrabass is a transposing instrument: written pitch sounds an octave
+    // lower than notated. Our note range (C4-H5) is well above the natural
+    // register of a real double bass, so without this shift the soundfont
+    // samples get stretched way up and lose their character. Shifting playback
+    // down an octave for this instrument only gives it its proper, natural tone.
     function shiftOctaveDown(noteName) {
         const match = noteName.match(/^([A-H]#?)(\d)$/);
         if (!match) return noteName;
@@ -1670,22 +1690,17 @@
 
     function playNote(noteName, duration = NOTE_PREVIEW_DURATION) {
         const playbackNote = getPlaybackNote(noteName);
-        if (state.instrument === 'sine' || !state.soundfont || !state.instrumentLoaded) {
-            playOscillatorNote(playbackNote, duration);
-        } else {
-            playSoundfontNote(playbackNote, duration);
-        }
+        if (state.instrument === 'sine') playOscillatorNote(playbackNote, duration);
+        else playSamplerNote(playbackNote, duration);
     }
 
     function startContinuousNote(noteName, groupId) {
         const playbackNote = getPlaybackNote(noteName);
-        if (state.instrument === 'sine' || !state.soundfont || !state.instrumentLoaded) {
+        if (state.instrument === 'sine') {
             const result = createOscillatorNode(playbackNote, true);
-            if (result) {
-                state.activeNotes.set(groupId, result);
-            }
+            if (result) state.activeNotes.set(groupId, result);
         } else {
-            playContinuousSoundfontNote(playbackNote, groupId);
+            startContinuousSamplerNote(playbackNote, groupId);
         }
     }
 
@@ -1715,25 +1730,52 @@
         return /[\u0400-\u04FF]/.test(char);
     }
 
+    // Cleans pasted/entered song text.
+    //
+    // Chord lines usually contain Latin note names (E, H, F#, G#m, Bb, etc.)
+    // and spacing/other chord symbols. Since the lyrics themselves are expected
+    // to be Cyrillic, keep only Cyrillic text, spaces and song punctuation.
+    // A line that contains no Cyrillic characters (for example "E   H   F#"
+    // or "Chorus:") becomes an empty line. Original empty lines are kept.
     function cleanLyricsLine(line) {
+        // Remember whether this line actually contained Latin letters (chord
+        // names like "Am", "G#m", etc.). Whitespace normalization below is
+        // only needed to clean up the gaps chords leave behind — it must NOT
+        // run on plain manual typing, or every space/indent the user types
+        // (including trailing/leading ones) gets stripped on every keystroke.
         const hadLatin = /[A-Za-z]/.test(line);
 
+        // First remove Latin letters. This also removes chord names embedded
+        // among spaces, leaving their #/b/m/etc. behind temporarily.
         let cleaned = line.replace(/[A-Za-z]/g, '');
 
+        // Keep only Cyrillic characters, whitespace and punctuation that can
+        // legitimately belong to the lyrics. This removes chord leftovers
+        // such as #, ♭, digits, slashes and other formatting characters.
         cleaned = cleaned.replace(/[^\u0400-\u04FF\s.,!?;:()\-–—«»"']/g, '');
 
+        // If there is no actual Cyrillic lyric text, discard the whole line.
+        // This removes chord-only lines and headings such as "Chorus:" while
+        // preserving genuinely empty lines between sections.
         if (!/[\u0400-\u04FF]/.test(cleaned)) {
             return '';
         }
 
         if (hadLatin) {
+            // Normalize excessive whitespace introduced by chord columns.
             return cleaned.replace(/[ \t]+/g, ' ').trim();
         }
 
+        // Plain manual typing: keep the user's spacing exactly as typed,
+        // including leading/trailing spaces and indents between words.
         return cleaned;
     }
 
     function cleanLyricsText(text) {
+        // Keep genuinely empty lines, but REMOVE non-empty lines that turn into
+        // nothing after cleaning (chord-only lines, "Chorus:", etc.). This is
+        // important: a chord line must not accidentally become an extra blank
+        // line, while blank lines intentionally used between song sections stay.
         return text.split('\n')
             .filter(line => {
                 if (line.trim() === '') return true;
@@ -1743,6 +1785,7 @@
             .join('\n');
     }
 
+    // Backward-compatible alias used by the live input handlers.
     function removeLatin(text) {
         return cleanLyricsText(text);
     }
@@ -1815,6 +1858,10 @@
         return line.trim().length === 0;
     }
 
+    // Computes the groups for a single line's text, reusing notes from the
+    // previous groups of that same line wherever the words still line up.
+    // Shared by the full-text rebuild below and by single-line edits made
+    // directly inside a line block's own text field.
     function computeGroupsForLineText(newLineText, existingGroups) {
         const newLineWords = mergePunctuation(wordsFromLine(newLineText));
         const existingWords = existingGroups.length > 0 ? getWordsFromGroups(existingGroups) : [];
@@ -1932,6 +1979,9 @@
         state.lines = preservedLines;
     }
 
+    // Updates one line's state and its visible groups immediately while the
+    // user is typing. The line input itself is NOT re-rendered, so focus and
+    // cursor position are preserved.
     function syncDetectedNoteLinks(line) {
         if (!line) return;
         const notes = line.detectedNotes || [];
@@ -1984,11 +2034,13 @@
         updateLineGroupsDOM(lineIdx);
     }
 
+    // Refresh only the visual parts of one line block. This avoids destroying
+    // and recreating the text input on every keystroke.
     function updateLineGroupsDOM(lineIdx) {
         const line = state.lines[lineIdx];
         if (!line) return;
 
-        const lineBlock = groupsContainer.querySelector(`.line-block[data-line="${lineIdx}"]`);
+        const lineBlock = groupsContainer.querySelector(`.line-block[data-line=\"${lineIdx}\"]`);
         if (!lineBlock) {
             renderGroups();
             return;
@@ -2022,16 +2074,16 @@
             const hasNote = note !== null;
             const isLastInLine = gi === line.groups.length - 1;
 
-            html += `<div class="chip" data-line="${lineIdx}" data-group="${gi}">`;
-            html += `<span class="text">${escapeHtml(displayText)}</span>`;
+            html += `<div class=\"chip\" data-line=\"${lineIdx}\" data-group=\"${gi}\">`;
+            html += `<span class=\"text\">${escapeHtml(displayText)}</span>`;
             const noteDisplay = hasNote ? note.replace(/\d/, '') : '♩';
-            html += `<span class="note-badge ${hasNote ? 'has-note' : ''}" title="${hasNote ? escapeHtml(note) : 'Тап на слово, щоб вибрати ноту'}">${noteDisplay}</span>`;
+            html += `<span class=\"note-badge ${hasNote ? 'has-note' : ''}\" title=\"${hasNote ? escapeHtml(note) : 'Тап на слово, щоб вибрати ноту'}\">${noteDisplay}</span>`;
 
             if (!isLastInLine) {
-                html += `<button class="action-btn merge-btn" data-action="merge" data-line="${lineIdx}" data-group="${gi}" title="Об'єднати з наступною групою">+</button>`;
+                html += `<button class=\"action-btn merge-btn\" data-action=\"merge\" data-line=\"${lineIdx}\" data-group=\"${gi}\" title=\"Об'єднати з наступною групою\">+</button>`;
             }
             if (group.words.length > 1) {
-                html += `<button class="action-btn split-btn" data-action="split" data-line="${lineIdx}" data-group="${gi}" title="Відокремити останнє слово">✂️</button>`;
+                html += `<button class=\"action-btn split-btn\" data-action=\"split\" data-line=\"${lineIdx}\" data-group=\"${gi}\" title=\"Відокремити останнє слово\">✂️</button>`;
             }
             html += `</div>`;
         }
@@ -2043,13 +2095,13 @@
                 openNotePopup(parseInt(chip.dataset.line), parseInt(chip.dataset.group));
             });
         });
-        chips.querySelectorAll('[data-action="merge"]').forEach(btn => {
+        chips.querySelectorAll('[data-action=\"merge\"]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 mergeGroupWithNext(parseInt(btn.dataset.line), parseInt(btn.dataset.group));
             });
         });
-        chips.querySelectorAll('[data-action="split"]').forEach(btn => {
+        chips.querySelectorAll('[data-action=\"split\"]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 splitGroup(parseInt(btn.dataset.line), parseInt(btn.dataset.group));
@@ -2059,6 +2111,9 @@
         groupCount.textContent = `${state.lines.reduce((sum, currentLine) => sum + (currentLine.isEmpty ? 0 : currentLine.groups.length), 0)} груп`;
     }
 
+    // Applies an edit made directly in a single line block's own text field:
+    // recomputes that line's groups (preserving matching notes) without
+    // touching any other line.
     function handleLineTextCommit(lineIdx, newLineText) {
         const line = state.lines[lineIdx];
         if (!line) return;
@@ -2077,6 +2132,7 @@
     // 6.5 LINE CREATION + MICROPHONE ANALYSIS
     // ============================================================
     function addEmptyLine() {
+        // A draft line is a real editable block, not a visual blank separator.
         state.lines.push({ groups: [], isEmpty: false, draft: true, rawText: '', collapsed: false, audioData: null, detectedNotes: [], notesCollapsed: false });
         updateTextareaFromState();
         renderAll();
@@ -2142,6 +2198,7 @@
             if (last && last.note === item.note && item.start - last.end < 0.12) last.end = item.end;
             else segments.push({ note: item.note, start: item.start, end: item.end });
         }
+        // Ignore very short pitch glitches and merge tiny gaps.
         return segments.filter(s => s.end - s.start >= 0.10).map(s => ({ note: s.note, duration: Math.max(0.1, s.end - s.start) }));
     }
 
@@ -2161,6 +2218,7 @@
                 duration: n.duration,
                 groupIdxs: []
             }));
+            // Do not generate or modify lyric text here. The existing text remains intact.
             renderAll();
         } catch (e) {
             console.error('Audio analysis error:', e);
@@ -2267,6 +2325,10 @@
         if (!detected || !target) return;
         const links = normalizeDetectedNoteLinks(line, detected);
 
+        // Up to two detected-note cells sharing the same letter (pitch class,
+        // e.g. both "C") may be bound to a single word group at once. Any
+        // existing binding with a different letter, or a third note, replaces
+        // the current binding(s) instead of stacking.
         const existingIds = groupDetectedIds(target).filter(id => id !== noteId);
         const sameLetterIds = existingIds.filter(id => {
             const other = line.detectedNotes.find(n => n.id === id);
@@ -2323,7 +2385,6 @@
         renderAll();
     }
 
-    // REQUIREMENT 1: Dynamic 1mm thickness based on window.devicePixelRatio
     function renderDetectedNoteConnections(lineIdx, visual) {
         const line = state.lines[lineIdx];
         if (!line || line.notesCollapsed) return;
@@ -2332,19 +2393,6 @@
         const box = visual.getBoundingClientRect();
         svg.setAttribute('viewBox', `0 0 ${Math.max(1, box.width)} ${Math.max(1, box.height)}`);
         svg.innerHTML = '';
-
-        // Calculate 1mm in CSS pixels, with Fallback to ~3.78px if DPI not detected
-        let dpi = 96;
-        if (window.matchMedia) {
-            for (let i = 96; i < 600; i += 10) {
-                if (window.matchMedia(`(max-resolution: ${i}dpi)`).matches) {
-                    dpi = i;
-                    break;
-                }
-            }
-        }
-        const mmInPx = (dpi / 25.4).toFixed(2);
-
         (line.detectedNotes || []).forEach(n => {
             const noteEl = visual.querySelector(`.detected-note[data-note-id="${CSS.escape(n.id)}"]`);
             if (!noteEl) return;
@@ -2364,7 +2412,8 @@
                 lineEl.setAttribute('x2', x2);
                 lineEl.setAttribute('y2', y2);
                 lineEl.setAttribute('stroke', 'currentColor');
-                lineEl.setAttribute('stroke-width', mmInPx);
+                lineEl.setAttribute('stroke-width', '0.7mm');
+                lineEl.setAttribute('vector-effect', 'non-scaling-stroke');
                 lineEl.setAttribute('stroke-linecap', 'round');
                 lineEl.setAttribute('opacity', '0.6');
                 svg.appendChild(lineEl);
@@ -2372,15 +2421,36 @@
         });
     }
 
-    // REQUIREMENT 3: Remove note if released outside block, also removing it from melody
     function setupDetectedNoteDrag(lineIdx, noteEl, visual) {
         let drag = null;
+        let lastTapAt = 0;
         const clearTargets = () => visual.querySelectorAll('.note-drop-target').forEach(el => el.classList.remove('note-drop-target'));
         const removeDetectedNote = (id) => {
             const line = state.lines[lineIdx];
             if (!line) return;
-            detachDetectedNote(lineIdx, id);
+            const n = line.detectedNotes?.find(x => x.id === id);
+            if (!n) return;
+
+            line.groups.forEach(g => {
+                const oldIds = groupDetectedIds(g);
+                if (!oldIds.includes(id)) return;
+                const ids = oldIds.filter(x => x !== id);
+                if (ids.length) {
+                    g._detectedNoteIds = ids;
+                    const remaining = ids
+                        .map(noteId => line.detectedNotes.find(x => x.id === noteId))
+                        .filter(Boolean);
+                    g.note = remaining.length ? remaining[remaining.length - 1].note : null;
+                    g.duration = remaining.reduce((sum, item) => sum + (Number(item.duration) > 0 ? Number(item.duration) : 0.1), 0.6);
+                } else {
+                    delete g._detectedNoteIds; delete g._detectedNoteId;
+                    g.note = null;
+                    g.duration = 0.6;
+                }
+            });
+
             line.detectedNotes = line.detectedNotes.filter(x => x.id !== id);
+            syncDetectedNoteLinks(line);
             renderAll();
         };
         const onMove = e => {
@@ -2398,83 +2468,78 @@
         };
         const finish = e => {
             if (!drag) return;
+            const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
+            const distance = Math.hypot(dx, dy);
             const under = document.elementFromPoint(e.clientX, e.clientY);
             const chip = under?.closest?.('.chip');
             const lineBlock = visual.closest('.line-block');
             const blockRect = lineBlock ? lineBlock.getBoundingClientRect() : null;
             const outsideBlock = blockRect ? (
-                e.clientX < blockRect.left ||
-                e.clientX > blockRect.right ||
-                e.clientY < blockRect.top ||
-                e.clientY > blockRect.bottom
+                e.clientX < blockRect.left || e.clientX > blockRect.right ||
+                e.clientY < blockRect.top || e.clientY > blockRect.bottom
             ) : false;
-
-            if (outsideBlock) {
-                removeDetectedNote(drag.noteId);
-            } else if (chip && chip.closest('.line-block')?.dataset.line === String(lineIdx)) {
-                attachDetectedNote(lineIdx, drag.noteId, parseInt(chip.dataset.group, 10));
-            }
-
             clearTargets();
-            if (drag.ghost) drag.ghost.remove();
+            drag.ghost.remove();
             noteEl.classList.remove('drag-source');
-            window.removeEventListener('pointermove', onMove);
-            window.removeEventListener('pointerup', finish);
-            window.removeEventListener('pointercancel', finish);
+            noteEl.releasePointerCapture?.(e.pointerId);
+            if (drag.moved && chip && chip.closest('.line-block')?.dataset.line === String(lineIdx)) {
+                // Dropped on a group's word chip — bind it.
+                attachDetectedNote(lineIdx, noteEl.dataset.noteId, parseInt(chip.dataset.group));
+            } else if (drag.moved && outsideBlock) {
+                // Releasing outside the current line block removes the note
+                // from both the editor and the recorded melody.
+                removeDetectedNote(noteEl.dataset.noteId);
+            }
+            // Otherwise (dropped inside the block but not on a group chip):
+            // the note was never actually moved in the DOM — only its drag
+            // ghost was — so it naturally snaps back to its original spot.
             drag = null;
         };
-
         noteEl.addEventListener('pointerdown', e => {
-            if (e.button !== 0 && e.pointerType === 'mouse') return;
             e.preventDefault();
-            const rect = noteEl.getBoundingClientRect();
+            const now = performance.now();
+            if (now - lastTapAt < 320) {
+                lastTapAt = 0;
+                openDetectedNotePopup(lineIdx, noteEl.dataset.noteId);
+                return;
+            }
+            lastTapAt = now;
+            const r = noteEl.getBoundingClientRect();
             const ghost = noteEl.cloneNode(true);
-            ghost.style.position = 'fixed';
-            ghost.style.left = `${rect.left}px`;
-            ghost.style.top = `${rect.top}px`;
-            ghost.style.width = `${rect.width}px`;
-            ghost.style.height = `${rect.height}px`;
-            ghost.style.zIndex = '9999';
-            ghost.style.pointerEvents = 'none';
-            ghost.classList.add('dragging');
+            ghost.classList.add('detected-note-drag-ghost');
+            Object.assign(ghost.style, { position:'fixed', left:`${r.left}px`, top:`${r.top}px`, width:`${r.width}px`, margin:'0', pointerEvents:'none', zIndex:'9999' });
             document.body.appendChild(ghost);
             noteEl.classList.add('drag-source');
-            drag = {
-                noteId: noteEl.dataset.noteId,
-                ghost,
-                startX: e.clientX,
-                startY: e.clientY,
-                offsetX: e.clientX - rect.left,
-                offsetY: e.clientY - rect.top,
-                moved: false
-            };
-            window.addEventListener('pointermove', onMove);
-            window.addEventListener('pointerup', finish);
-            window.addEventListener('pointercancel', finish);
+            drag = { startX:e.clientX, startY:e.clientY, offsetX:e.clientX-r.left, offsetY:e.clientY-r.top, moved:false, startedAt:performance.now(), ghost };
+            noteEl.setPointerCapture?.(e.pointerId);
         });
+        noteEl.addEventListener('pointermove', onMove);
+        noteEl.addEventListener('pointerup', finish);
+        noteEl.addEventListener('pointercancel', finish);
+        noteEl.addEventListener('dblclick', e => { e.preventDefault(); e.stopPropagation(); openDetectedNotePopup(lineIdx, noteEl.dataset.noteId); });
     }
 
     function mergeGroupWithNext(lineIdx, groupIdx) {
         const line = state.lines[lineIdx];
         if (!line || line.isEmpty) return;
-        if (groupIdx < 0 || groupIdx >= line.groups.length - 1) return;
+        const groups = line.groups;
+        if (groupIdx < 0 || groupIdx >= groups.length - 1) return;
 
-        const current = line.groups[groupIdx];
-        const next = line.groups[groupIdx + 1];
+        const current = groups[groupIdx];
+        const next = groups[groupIdx + 1];
+        if (!current || !next) return;
 
-        const combinedWords = [...current.words, ...next.words];
-        const combinedNote = current.note || next.note;
-        const combinedDuration = Math.max(current.duration || 0.6, next.duration || 0.6);
-        const combinedIds = Array.from(new Set([...groupDetectedIds(current), ...groupDetectedIds(next)]));
+        const mergedWords = [...current.words, ...next.words];
+        const note = current.note !== null ? current.note : next.note;
 
-        line.groups.splice(groupIdx, 2, {
-            words: combinedWords,
-            note: combinedNote,
-            duration: combinedDuration,
-            _detectedNoteIds: combinedIds
+        groups.splice(groupIdx, 2, {
+            words: mergedWords,
+            note: note,
+            duration: (current.duration || 0.6) + (next.duration || 0.6)
         });
 
-        syncDetectedNoteLinks(line);
+        (line.detectedNotes || []).forEach(n => { n.groupIdxs = []; delete n.groupIdx; });
+        line.groups.forEach(g => { delete g._detectedNoteIds; delete g._detectedNoteId; });
         updateTextareaFromState();
         renderAll();
     }
@@ -2482,355 +2547,469 @@
     function splitGroup(lineIdx, groupIdx) {
         const line = state.lines[lineIdx];
         if (!line || line.isEmpty) return;
-        const g = line.groups[groupIdx];
-        if (!g || g.words.length <= 1) return;
+        const group = line.groups[groupIdx];
+        if (!group) return;
+        if (group.words.length <= 1) return;
 
-        const lastWord = g.words.pop();
-        const ids = groupDetectedIds(g);
+        const words = group.words;
+        const lastWord = words[words.length - 1];
+        const restWords = words.slice(0, words.length - 1);
+        const note = group.note;
 
-        line.groups.splice(groupIdx + 1, 0, {
+        line.groups.splice(groupIdx, 1, {
+            words: restWords,
+            note: note,
+            duration: group.duration || 0.6
+        }, {
             words: [lastWord],
             note: null,
-            duration: 0.6,
-            _detectedNoteIds: []
+            duration: 0.6
         });
 
-        syncDetectedNoteLinks(line);
+        (line.detectedNotes || []).forEach(n => { n.groupIdxs = []; delete n.groupIdx; });
+        line.groups.forEach(g => { delete g._detectedNoteIds; delete g._detectedNoteId; });
         updateTextareaFromState();
         renderAll();
     }
 
-    function updateTextareaFromState() {
-        lyricsInput.value = state.lines.map(line => {
-            if (line.isEmpty) return '';
-            if (line.rawText !== undefined) return line.rawText;
-            return line.groups.map(g => g.words.join(' ')).join(' ');
-        }).join('\n');
-    }
-
     function clearAllGroups() {
-        lyricsInput.value = '';
-        state.lines = [];
+        if (!confirm('Ви впевнені, що хочете очистити всі групи та ноти?')) return;
+        const text = lyricsInput.value;
+        const lines = parseTextToLines(text);
+        state.lines = lines.map(line => {
+            if (isLineEmpty(line)) {
+                return { groups: [], isEmpty: true, collapsed: false, detectedNotes: [] };
+            }
+            return {
+                groups: mergePunctuation(wordsFromLine(line)).map(w => ({
+                    words: [w],
+                    note: null
+                })),
+                isEmpty: false,
+                rawText: line,
+                collapsed: false,
+                detectedNotes: []
+            };
+        });
         renderAll();
     }
 
+    function updateTextareaFromState() {
+        lyricsInput.value = state.lines.map(line => line.rawText ?? (line.isEmpty ? '' : line.groups.flatMap(g => g.words).join(' '))).join('\n');
+    }
+
     // ============================================================
-    // 8. RENDER FUNCTIONS
+    // 8. RENDER
     // ============================================================
+    function getGroupId(lineIdx, groupIdx) {
+        return `g-${lineIdx}-${groupIdx}`;
+    }
+
     function renderGroups() {
-        if (!state.lines || state.lines.length === 0) {
-            groupsContainer.innerHTML = `<div class="empty-state"><span class="big-icon">✍️</span>Введіть текст пісні у полі вище або натисніть "Додати рядок"</div>`;
+        const container = groupsContainer;
+        if (!state.lines.length || state.lines.every(l => l.isEmpty && !l.draft)) {
+            container.innerHTML = `<div class="empty-state"><span class="big-icon">📝</span>Вставте текст в поле для тексту пісні, щоб створити групи слів</div>`;
             groupCount.textContent = '0 груп';
             return;
         }
 
         let totalGroups = 0;
         let html = '';
-
+        let displayLineNumber = 0;
         for (let li = 0; li < state.lines.length; li++) {
             const line = state.lines[li];
 
             if (line.isEmpty) {
-                html += `<div class="line-block-empty" data-line="${li}"></div>`;
+                html += `<div class="line-block-empty"></div>`;
                 continue;
             }
 
-            const isCollapsed = !!line.collapsed;
+            totalGroups += line.groups.length;
             const lineText = line.rawText ?? line.groups.flatMap(g => g.words).join(' ');
-            const isDraft = !!line.draft;
+            if (lineText.trim()) displayLineNumber++;
+            const collapsedClass = line.collapsed ? ' collapsed' : '';
 
-            html += `<div class="line-block ${isCollapsed ? 'collapsed' : ''} ${isDraft ? 'draft' : ''}" data-line="${li}">`;
+            const draftClass = line.draft ? ' draft' : '';
+            html += `<div class="line-block${collapsedClass}${draftClass}" data-line="${li}">`;
+
             html += `<div class="line-block-header" data-line="${li}">`;
-            html += `<button class="collapse-toggle">▼</button>`;
-            html += `<span class="line-number">${li + 1}</span>`;
-            html += `<span class="line-preview">${escapeHtml(lineText || '(Порожній рядок)')}</span>`;
-            if (line.audioData) html += `<span class="line-audio-badge" title="Є записане аудіо">🎙</span>`;
+            html += `<button class="collapse-toggle" type="button" tabindex="-1" title="Згорнути/розгорнути рядок">▾</button>`;
+            html += `<span class="line-number">${displayLineNumber}</span>`;
+            html += `<span class="line-preview">${escapeHtml(lineText)}</span>`;
             html += `</div>`;
 
             html += `<div class="line-block-body">`;
-            html += `<input type="text" class="line-text-input" data-line="${li}" value="${escapeHtml(lineText)}" placeholder="Текст рядка...">`;
-
+            html += `<input type="text" class="line-text-input" data-line="${li}" placeholder="Текст рядка">`;
+            const notes = line.detectedNotes || [];
             html += `<div class="record-actions">`;
-            html += `<button class="record-line-btn" data-line="${li}">🎙 Записати спів</button>`;
-            if (line.detectedNotes && line.detectedNotes.length > 0) {
-                html += `<button class="clear-line-notes-btn" data-line="${li}">🗑 Очистити записи нот</button>`;
-            }
+            html += `<button class="record-line-btn" data-line="${li}" type="button">🎙 Додати аудіо</button>`;
+            html += `<button class="clear-line-notes-btn" data-clear-line-notes="${li}" type="button">🗑 Видалити всі ноти</button>`;
+            html += `<button class="line-notes-toggle" data-toggle-notes="${li}" type="button">♫ Ноти${notes.length ? ` (${notes.length})` : ''} ${line.notesCollapsed ? '▸' : '▾'}</button>`;
+            if (line.audioData) html += `<span class="line-audio-badge">● Аудіо проаналізовано</span>`;
             html += `<span class="record-status" data-record-status="${li}"></span>`;
             html += `</div>`;
-
-            if (line.detectedNotes && line.detectedNotes.length > 0) {
-                const notesCollapsed = !!line.notesCollapsed;
-                html += `<div class="line-notes-visual ${notesCollapsed ? 'notes-collapsed' : ''}">`;
-                html += `<div class="line-notes-controls">`;
-                html += `<button class="line-notes-toggle" data-line="${li}">${notesCollapsed ? '▶ Показати записані ноти' : '▼ Сховати записані ноти'}</button>`;
-                html += `</div>`;
-                html += `<svg class="line-notes-connections"></svg>`;
-                html += `<div class="line-notes-strip">`;
-                line.detectedNotes.forEach(n => {
-                    html += `<div class="detected-note" data-note-id="${escapeHtml(n.id)}" title="Перетягніть на слово для прив'язки">${escapeHtml(n.note)}<span class="detected-note-duration">${n.duration.toFixed(1)}s</span></div>`;
+            const notesCollapsed = line.notesCollapsed ? ' notes-collapsed' : '';
+            html += `<div class="line-notes-visual${notesCollapsed}" data-notes-visual="${li}">`;
+            html += `<svg class="line-notes-connections" aria-hidden="true"></svg>`;
+            html += `<div class="line-notes-strip">`;
+            if (notes.length) {
+                notes.forEach(n => {
+                    html += `<div class="detected-note" data-note-id="${escapeHtml(n.id)}" title="${escapeHtml(n.note)} — ${n.duration.toFixed(2)} с">${escapeHtml(n.note.replace(/\d/, ''))}<span class="detected-note-duration">${n.duration.toFixed(2)}s</span></div>`;
                 });
-                html += `</div>`;
-                html += `</div>`;
+            } else {
+                html += `<div class="line-notes-empty">Після запису тут з’являться визначені ноти</div>`;
             }
-
-            if (line.groups && line.groups.length > 0) {
+            html += `</div>`;
+            if (line.groups.length) {
                 html += `<div class="chips">`;
                 for (let gi = 0; gi < line.groups.length; gi++) {
                     const group = line.groups[gi];
-                    totalGroups++;
-                    const displayText = group.words.join(' ');
+                    const words = group.words;
                     const note = group.note;
+                    const displayText = words.join(' ');
                     const hasNote = note !== null;
                     const isLastInLine = gi === line.groups.length - 1;
 
                     html += `<div class="chip" data-line="${li}" data-group="${gi}">`;
                     html += `<span class="text">${escapeHtml(displayText)}</span>`;
+
                     const noteDisplay = hasNote ? note.replace(/\d/, '') : '♩';
-                    html += `<span class="note-badge ${hasNote ? 'has-note' : ''}" title="${hasNote ? escapeHtml(note) : 'Тап на слово, щоб вибрати ноту'}">${noteDisplay}</span>`;
+                    html += `<span class="note-badge ${hasNote ? 'has-note' : ''}" title="${hasNote ? note : 'Тап на слово, щоб вибрати ноту'}">${noteDisplay}</span>`;
 
                     if (!isLastInLine) {
                         html += `<button class="action-btn merge-btn" data-action="merge" data-line="${li}" data-group="${gi}" title="Об'єднати з наступною групою">+</button>`;
                     }
+
                     if (group.words.length > 1) {
                         html += `<button class="action-btn split-btn" data-action="split" data-line="${li}" data-group="${gi}" title="Відокремити останнє слово">✂️</button>`;
                     }
+
                     html += `</div>`;
                 }
                 html += `</div>`;
             }
-
+            html += `</div>`;
             html += `</div></div>`;
         }
 
-        groupsContainer.innerHTML = html;
+        container.innerHTML = html;
         groupCount.textContent = `${totalGroups} груп`;
 
-        groupsContainer.querySelectorAll('.line-block-header').forEach(header => {
-            header.addEventListener('click', (e) => {
-                const lineIdx = parseInt(header.dataset.line);
-                toggleLineCollapsed(lineIdx);
-            });
-        });
+        // Values are assigned via JS (not baked into the HTML string) so line
+        // text containing quotes/special characters can never break the markup.
+        container.querySelectorAll('.line-text-input').forEach(input => {
+            const li = parseInt(input.dataset.line);
+            const line = state.lines[li];
+            input.value = (line && !line.isEmpty) ? (line.rawText ?? line.groups.flatMap(g => g.words).join(' ')) : '';
 
-        groupsContainer.querySelectorAll('.line-text-input').forEach(input => {
-            input.addEventListener('click', e => e.stopPropagation());
-            input.addEventListener('input', (e) => {
-                const lineIdx = parseInt(input.dataset.line);
-                handleLineTextLiveEdit(lineIdx, input.value);
-            });
-            input.addEventListener('change', (e) => {
-                const lineIdx = parseInt(input.dataset.line);
-                handleLineTextCommit(lineIdx, input.value);
-            });
-        });
+            // Update groups immediately while typing. Only the groups/preview
+            // DOM is refreshed, so this input keeps focus and its caret position.
+            input.addEventListener('input', () => {
+                let newText = removeLatin(input.value);
 
-        groupsContainer.querySelectorAll('.record-line-btn').forEach(btn => {
-            btn.addEventListener('click', e => {
-                e.stopPropagation();
-                toggleLineRecording(parseInt(btn.dataset.line));
-            });
-        });
+                if (input.value !== newText) {
+                    const start = input.selectionStart;
+                    const cleanedPrefix = cleanLyricsText(input.value.slice(0, start));
+                    const newCursorPosition = cleanedPrefix.length;
 
-        groupsContainer.querySelectorAll('.clear-line-notes-btn').forEach(btn => {
-            btn.addEventListener('click', e => {
-                e.stopPropagation();
-                clearDetectedNotes(parseInt(btn.dataset.line));
-            });
-        });
+                    input.value = newText;
+                    input.setSelectionRange(newCursorPosition, newCursorPosition);
+                }
 
-        groupsContainer.querySelectorAll('.line-notes-toggle').forEach(btn => {
-            btn.addEventListener('click', e => {
-                e.stopPropagation();
-                const li = parseInt(btn.dataset.line);
-                const line = state.lines[li];
-                if (line) {
-                    line.notesCollapsed = !line.notesCollapsed;
-                    renderAll();
+                handleLineTextLiveEdit(li, input.value);
+            });
+
+            input.addEventListener('blur', () => {
+                handleLineTextCommit(li, input.value);
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    input.blur();
                 }
             });
+            input.addEventListener('click', (e) => e.stopPropagation());
         });
 
-        groupsContainer.querySelectorAll('.chip').forEach(chip => {
+        container.querySelectorAll('.line-block-header').forEach(header => {
+            header.addEventListener('click', () => {
+                const li = parseInt(header.dataset.line);
+                toggleLineCollapsed(li);
+            });
+        });
+
+        container.querySelectorAll('.chip').forEach(chip => {
             chip.addEventListener('click', (e) => {
                 if (e.target.closest('.action-btn')) return;
-                openNotePopup(parseInt(chip.dataset.line), parseInt(chip.dataset.group));
+                const line = parseInt(chip.dataset.line);
+                const group = parseInt(chip.dataset.group);
+                openNotePopup(line, group);
             });
         });
 
-        groupsContainer.querySelectorAll('[data-action="merge"]').forEach(btn => {
+        container.querySelectorAll('[data-action="merge"]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                mergeGroupWithNext(parseInt(btn.dataset.line), parseInt(btn.dataset.group));
+                const line = parseInt(btn.dataset.line);
+                const group = parseInt(btn.dataset.group);
+                mergeGroupWithNext(line, group);
             });
         });
 
-        groupsContainer.querySelectorAll('[data-action="split"]').forEach(btn => {
+        container.querySelectorAll('[data-action="split"]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                splitGroup(parseInt(btn.dataset.line), parseInt(btn.dataset.group));
+                const line = parseInt(btn.dataset.line);
+                const group = parseInt(btn.dataset.group);
+                splitGroup(line, group);
             });
         });
 
-        groupsContainer.querySelectorAll('.line-notes-visual').forEach(visual => {
-            const lineBlock = visual.closest('.line-block');
-            if (!lineBlock) return;
-            const li = parseInt(lineBlock.dataset.line);
+        container.querySelectorAll('[data-toggle-notes]').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.preventDefault();
+                const li = parseInt(btn.dataset.toggleNotes);
+                const line = state.lines[li];
+                if (!line) return;
+                line.notesCollapsed = !line.notesCollapsed;
+                renderAll();
+            });
+        });
+        container.querySelectorAll('[data-clear-line-notes]').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.preventDefault();
+                clearDetectedNotes(parseInt(btn.dataset.clearLineNotes));
+            });
+        });
+        container.querySelectorAll('[data-notes-visual]').forEach(visual => {
+            const li = parseInt(visual.dataset.notesVisual);
             visual.querySelectorAll('.detected-note').forEach(noteEl => setupDetectedNoteDrag(li, noteEl, visual));
             requestAnimationFrame(() => renderDetectedNoteConnections(li, visual));
         });
     }
 
-    // REQUIREMENT 2: Line Playback implementation in Player Section
+
+    // ============================================================
+    // 8.5 LINE PLAYER
+    // ============================================================
+    function lineNotes(lineIdx) {
+        const line = state.lines[lineIdx];
+        return line ? (line.detectedNotes || []) : [];
+    }
+    function noteGroupIdxs(n) {
+        return Array.isArray(n.groupIdxs) ? n.groupIdxs : (n.groupIdx != null ? [n.groupIdx] : []);
+    }
+    function lineDuration(lineIdx) {
+        return lineNotes(lineIdx).reduce((s, n) => s + (n.duration || 0.1), 0);
+    }
+    function stopLinePlayback(collapse = true) {
+        const pp = state.playerPlayback;
+        if (pp.timer) clearTimeout(pp.timer);
+        if (pp.raf) cancelAnimationFrame(pp.raf);
+        pp.timer = null; pp.raf = null;
+        stopAllContinuous();
+        if (collapse && pp.expanded !== null) pp.expanded = null;
+        pp.playing = false; pp.lineIdx = null; pp.elapsed = 0;
+        document.querySelectorAll('.player-chip.playing-group').forEach(el => el.classList.remove('playing-group'));
+        document.querySelectorAll('.player-line.playing-line').forEach(el => el.classList.remove('playing-line'));
+    }
+    function setPlayerProgress(lineIdx, elapsed) {
+        const line = state.lines[lineIdx]; if (!line) return;
+        const total = lineDuration(lineIdx);
+        const clamped = Math.max(0, Math.min(total, elapsed));
+        state.playerPlayback.elapsed = clamped;
+        const root = playerContainer.querySelector(`.player-line[data-line="${lineIdx}"]`);
+        if (!root) return;
+        const pct = total ? clamped / total * 100 : 0;
+        const progress = root.querySelector('.player-track-progress');
+        const dot = root.querySelector('.player-track-dot');
+        const current = root.querySelector('.player-current-time');
+        if (progress) progress.style.width = pct + '%';
+        if (dot) dot.style.left = pct + '%';
+        if (current) current.textContent = formatTime(clamped);
+        // Figure out which word group(s) correspond to whatever note in the
+        // recorded melody is sounding right now, and highlight only those —
+        // this is what keeps the highlighted word in sync with the actual
+        // recorded pitch/timing (the melody), not just a flat per-word timer.
+        const notes = lineNotes(lineIdx);
+        const activeGroups = new Set();
+        let pos = 0;
+        for (const n of notes) {
+            const d = n.duration || 0.1;
+            if (clamped >= pos && clamped < pos + d && clamped < total) {
+                noteGroupIdxs(n).forEach(gi => activeGroups.add(gi));
+            }
+            pos += d;
+        }
+        root.querySelectorAll('.player-chip').forEach(chip => {
+            const gi = parseInt(chip.dataset.group);
+            chip.classList.toggle('playing-group', activeGroups.has(gi));
+        });
+    }
+    function formatTime(sec) { sec = Math.max(0, sec || 0); return `${Math.floor(sec/60)}:${String(Math.floor(sec%60)).padStart(2,'0')}`; }
+    function playLineFrom(lineIdx, startAt = 0) {
+        const line = state.lines[lineIdx]; if (!line || !line.audioData) return;
+        const notes = lineNotes(lineIdx);
+        if (!notes.length) return;
+        stopLinePlayback(false);
+        state.playerPlayback.lineIdx = lineIdx;
+        state.playerPlayback.expanded = lineIdx;
+        state.playerPlayback.playing = true;
+        state.playerPlayback.elapsed = Math.min(startAt, lineDuration(lineIdx));
+        state.playerPlayback.startedAt = performance.now();
+        const speed = state.playerPlayback.speed || 1;
+        let elapsed = state.playerPlayback.elapsed;
+        let pos = 0;
+        for (let i = 0; i < notes.length; i++) {
+            const n = notes[i];
+            const d = n.duration || 0.1;
+            if (elapsed >= pos + d) { pos += d; continue; }
+            const remaining = pos + d - elapsed;
+            if (n.note) playNote(n.note, Math.max(0.08, remaining / speed));
+            const delay = remaining * 1000 / speed;
+            state.playerPlayback.timer = setTimeout(() => playNextNote(lineIdx, i + 1), delay);
+            break;
+        }
+        renderPlayer();
+        requestAnimationFrame(playerAnimationFrame);
+    }
+    function playNextNote(lineIdx, noteIdx) {
+        if (!state.playerPlayback.playing || state.playerPlayback.lineIdx !== lineIdx) return;
+        const notes = lineNotes(lineIdx);
+        if (noteIdx >= notes.length) { stopLinePlayback(false); setPlayerProgress(lineIdx, lineDuration(lineIdx)); renderPlayer(); return; }
+        const before = notes.slice(0, noteIdx).reduce((s, n) => s + (n.duration || 0.1), 0);
+        state.playerPlayback.elapsed = before;
+        state.playerPlayback.startedAt = performance.now();
+        const n = notes[noteIdx];
+        const d = n.duration || 0.1;
+        if (n.note) playNote(n.note, d / (state.playerPlayback.speed || 1));
+        state.playerPlayback.timer = setTimeout(() => playNextNote(lineIdx, noteIdx + 1), d * 1000 / (state.playerPlayback.speed || 1));
+    }
+    function playerAnimationFrame() {
+        const pp = state.playerPlayback;
+        if (!pp.playing || pp.lineIdx === null) return;
+        const elapsed = pp.elapsed + (performance.now() - pp.startedAt) / 1000 * (pp.speed || 1);
+        setPlayerProgress(pp.lineIdx, elapsed);
+        if (elapsed >= lineDuration(pp.lineIdx)) {
+            const finishedLine = pp.lineIdx;
+            if (pp.timer) clearTimeout(pp.timer);
+            pp.timer = null;
+            pp.playing = false;
+            pp.elapsed = lineDuration(finishedLine);
+            pp.lineIdx = finishedLine;
+            setPlayerProgress(finishedLine, pp.elapsed);
+            renderPlayer();
+            return;
+        }
+        pp.raf = requestAnimationFrame(playerAnimationFrame);
+    }
+    function togglePlayerLine(lineIdx) {
+        const line = state.lines[lineIdx];
+        if (state.playerPlayback.expanded === lineIdx) { stopLinePlayback(true); renderPlayer(); return; }
+        // Only lines with a recorded/analyzed melody can be expanded and
+        // played — without a recording there is nothing to play back.
+        if (!line || !line.audioData || !lineNotes(lineIdx).length) return;
+        stopLinePlayback(true);
+        state.playerPlayback.speed = 1;
+        playLineFrom(lineIdx, 0);
+    }
+    function seekLinePlayer(lineIdx, ratio) {
+        const total = lineDuration(lineIdx); const at = Math.max(0, Math.min(1, ratio)) * total;
+        if (state.playerPlayback.lineIdx === lineIdx && state.playerPlayback.playing) playLineFrom(lineIdx, at);
+        else { state.playerPlayback.lineIdx = lineIdx; state.playerPlayback.expanded = lineIdx; state.playerPlayback.elapsed = at; renderPlayer(); setPlayerProgress(lineIdx, at); }
+    }
+    function switchPlayerLine(delta) {
+        const current = state.playerPlayback.expanded ?? 0;
+        const candidates = state.lines.map((l,i)=>({l,i})).filter(x=>!x.l.isEmpty && x.l.groups.length && x.l.audioData && lineNotes(x.i).length);
+        const idx = candidates.findIndex(x=>x.i === current);
+        const next = candidates[Math.max(0, Math.min(candidates.length-1, idx + delta))];
+        if (!next) return;
+        const targetEl = playerContainer.querySelector(`.player-line[data-line="${next.i}"]`);
+        targetEl?.scrollIntoView({ behavior:'smooth', block:'center' });
+        playLineFrom(next.i, 0);
+    }
+
     function renderPlayer() {
-        if (!state.lines || state.lines.length === 0) {
-            playerContainer.innerHTML = `<div class="empty-state"><span class="big-icon">🎵</span>Немає даних для відображення. Спочатку введіть текст у редакторі.</div>`;
+        const container = playerContainer;
+        if (!state.lines.length || state.lines.every(l => l.isEmpty || l.groups.length === 0)) {
+            container.innerHTML = `<div class="empty-state"><span class="big-icon">🎤</span>Немає груп для тренування. Спочатку створіть групи в редакторі.</div>`;
             playerGroupCount.textContent = '0 груп';
             return;
         }
-
         let totalGroups = 0;
         let html = '';
-
+        let displayLineNumber = 0;
         for (let li = 0; li < state.lines.length; li++) {
             const line = state.lines[li];
-
-            if (line.isEmpty) {
-                html += `<div class="player-line empty-line"></div>`;
-                continue;
-            }
-
-            const pState = state.playerPlayback;
-            const isThisLinePlaying = pState.playing && pState.lineIdx === li;
-
-            html += `<div class="player-line ${isThisLinePlaying ? 'playing-line' : ''}" data-player-line="${li}">`;
+            if (line.isEmpty) { html += `<div class="player-line empty-line"></div>`; continue; }
+            if (!line.groups.length) continue;
+            totalGroups += line.groups.length;
+            const expanded = state.playerPlayback.expanded === li;
+            html += `<div class="player-line${state.playerPlayback.lineIdx===li && state.playerPlayback.playing?' playing-line':''}" data-line="${li}">`;
             html += `<div class="player-line-head">`;
-            html += `<button class="player-line-play" data-play-line="${li}">${isThisLinePlaying ? '⏸' : '▶'}</button>`;
-            html += `<span class="player-line-label">РЯДОК ${li + 1}</span>`;
-            html += `</div>`;
-
-            if (line.groups && line.groups.length > 0) {
-                html += `<div class="player-chips" style="margin-top:8px;">`;
-                for (let gi = 0; gi < line.groups.length; gi++) {
-                    const group = line.groups[gi];
-                    totalGroups++;
-                    const displayText = group.words.join(' ');
-                    const note = group.note;
-                    const hasNote = note !== null;
-
-                    html += `<div class="player-chip" data-line="${li}" data-group="${gi}">`;
-                    html += `<span>${escapeHtml(displayText)}</span>`;
-                    if (hasNote) {
-                        html += `<span class="note-label">${escapeHtml(note)}</span>`;
-                    }
-                    html += `</div>`;
-                }
+            const hasAudio = !!line.audioData && lineNotes(li).length > 0;
+            html += `<button class="player-line-play${expanded?' expanded':''}${hasAudio?'':' disabled'}" data-line-play="${li}" title="${hasAudio?'Програти рядок':'Немає запису для цього рядка'}">▶</button>`;
+            html += `<span class="player-line-label">${state.lines.slice(0, li + 1).filter(l => !l.isEmpty && ((l.rawText ?? '').trim().length || l.groups.length)).length}</span>`;
+            html += `<div class="player-chips">`;
+            for (let gi = 0; gi < line.groups.length; gi++) {
+                const group = line.groups[gi];
+                const note = group.note;
+                const displayText = group.words.join(' ');
+                const groupId = getGroupId(li, gi);
+                const boundNotes = groupDetectedIds(group)
+                    .map(id => (line.detectedNotes || []).find(n => n.id === id))
+                    .filter(Boolean);
+                const hasNote = boundNotes.length > 0 || note !== null;
+                const noteDisplay = boundNotes.length
+                    ? boundNotes.map(n => n.note.replace(/\d/, '')).join('·')
+                    : (hasNote ? note.replace(/\d/, '') : '—');
+                html += `<div class="player-chip" data-group-id="${groupId}" data-line="${li}" data-group="${gi}" data-note="${note || ''}">${escapeHtml(displayText)}`;
+                if (hasNote) html += `<span class="note-label">${noteDisplay}</span>`;
                 html += `</div>`;
             }
-
+            html += `</div></div>`;
+            if (expanded) {
+                const total = lineDuration(li);
+                const elapsed = state.playerPlayback.lineIdx===li ? state.playerPlayback.elapsed : 0;
+                const pct = total ? elapsed/total*100 : 0;
+                html += `<div class="player-line-player" data-player="${li}">`;
+                html += `<div class="player-track" data-seek-line="${li}"><div class="player-track-progress" style="width:${pct}%"></div><div class="player-track-dot" style="left:${pct}%"></div></div>`;
+                html += `<div class="player-time"><span class="player-current-time">${formatTime(elapsed)}</span><span>${formatTime(total)}</span></div>`;
+                html += `<div class="player-tools">`;
+                html += `<button class="player-mini-btn" data-prev-line="${li}" title="Попередній рядок">⏮</button>`;
+                html += `<button class="player-mini-btn" data-restart-line="${li}" title="Спочатку">↺</button>`;
+                html += `<button class="player-mini-btn" data-next-line="${li}" title="Наступний рядок">⏭</button>`;
+                html += `<div class="player-speed">Швидкість <input type="range" min="0.333" max="1" step="0.001" value="${state.playerPlayback.speed||1}" data-speed-line="${li}"><span>${(state.playerPlayback.speed||1).toFixed(2)}×</span></div>`;
+                html += `</div></div>`;
+            }
             html += `</div>`;
         }
-
-        playerContainer.innerHTML = html;
+        container.innerHTML = html;
         playerGroupCount.textContent = `${totalGroups} груп`;
-
-        playerContainer.querySelectorAll('.player-chip').forEach(chip => {
-            const li = parseInt(chip.dataset.line);
-            const gi = parseInt(chip.dataset.group);
-            const group = getGroup(li, gi);
-
-            if (!group || !group.note) return;
-
-            const start = (e) => {
-                e.preventDefault();
-                stopAllContinuous();
-                state.holdingId = `${li}-${gi}`;
-                chip.classList.add('holding');
-                startContinuousNote(group.note, state.holdingId);
-            };
-
-            const stop = (e) => {
-                e.preventDefault();
-                if (state.holdingId === `${li}-${gi}`) {
-                    chip.classList.remove('holding');
-                    stopContinuousNote(state.holdingId);
-                    state.holdingId = null;
-                }
-            };
-
-            chip.addEventListener('pointerdown', start);
-            chip.addEventListener('pointerup', stop);
-            chip.addEventListener('pointercancel', stop);
-            chip.addEventListener('pointerleave', stop);
+        container.querySelectorAll('.player-line-play').forEach(btn => {
+            btn.type='button';
+            btn.addEventListener('pointerup', e => { e.preventDefault(); e.stopPropagation(); if (btn.classList.contains('disabled')) return; const li=parseInt(btn.dataset.linePlay); if(Number.isInteger(li)) togglePlayerLine(li); });
         });
-
-        playerContainer.querySelectorAll('[data-play-line]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const li = parseInt(btn.dataset.play-line, 10);
-                toggleLinePlayback(li);
-            });
+        container.querySelectorAll('[data-prev-line]').forEach(btn => btn.addEventListener('click', ()=>switchPlayerLine(-1)));
+        container.querySelectorAll('[data-next-line]').forEach(btn => btn.addEventListener('click', ()=>switchPlayerLine(1)));
+        container.querySelectorAll('[data-restart-line]').forEach(btn => btn.addEventListener('click', ()=>playLineFrom(parseInt(btn.dataset.restartLine),0)));
+        container.querySelectorAll('[data-speed-line]').forEach(input => input.addEventListener('input', ()=>{
+            const v=parseFloat(input.value); state.playerPlayback.speed=v; input.nextElementSibling.textContent=v.toFixed(2)+'×';
+        }));
+        container.querySelectorAll('[data-seek-line]').forEach(track => {
+            const seek = e => { const r=track.getBoundingClientRect(); seekLinePlayer(parseInt(track.dataset.seekLine),(e.clientX-r.left)/r.width); };
+            track.addEventListener('pointerdown', e=>{ track.setPointerCapture?.(e.pointerId); seek(e); });
+            track.addEventListener('pointermove', e=>{ if(e.buttons) seek(e); });
         });
-    }
-
-    function toggleLinePlayback(lineIdx) {
-        const p = state.playerPlayback;
-        if (p.playing && p.lineIdx === lineIdx) {
-            stopLinePlayback();
-        } else {
-            stopLinePlayback();
-            startLinePlayback(lineIdx);
-        }
-    }
-
-    function startLinePlayback(lineIdx) {
-        const line = state.lines[lineIdx];
-        if (!line || !line.groups || line.groups.length === 0) return;
-
-        const p = state.playerPlayback;
-        p.playing = true;
-        p.lineIdx = lineIdx;
-
-        renderPlayer();
-
-        let groupIndex = 0;
-
-        function playNextGroup() {
-            if (!p.playing || p.lineIdx !== lineIdx) return;
-
-            if (groupIndex >= line.groups.length) {
-                stopLinePlayback();
-                return;
-            }
-
-            const group = line.groups[groupIndex];
-            const chip = playerContainer.querySelector(`.player-chip[data-line="${lineIdx}"][data-group="${groupIndex}"]`);
-
-            if (chip) chip.classList.add('playing-group');
-
-            if (group.note) {
-                playNote(group.note, group.duration || 0.6);
-            }
-
-            const currentDurationMs = ((group.duration || 0.6) * 1000) / p.speed;
-
-            p.timer = setTimeout(() => {
-                if (chip) chip.classList.remove('playing-group');
-                groupIndex++;
-                playNextGroup();
-            }, currentDurationMs);
-        }
-
-        playNextGroup();
-    }
-
-    function stopLinePlayback() {
-        const p = state.playerPlayback;
-        p.playing = false;
-        if (p.timer) clearTimeout(p.timer);
-        p.timer = null;
-        p.lineIdx = null;
-        
-        playerContainer.querySelectorAll('.playing-group').forEach(c => c.classList.remove('playing-group'));
-        renderPlayer();
+        container.querySelectorAll('.player-chip').forEach(chip => {
+            const note = chip.dataset.note, groupId = chip.dataset.groupId;
+            if (!note) { chip.style.opacity='0.5'; chip.style.cursor='not-allowed'; chip.title='Немає ноти'; return; }
+            const startHold=e=>{ e.preventDefault(); if(state.holdingId===groupId)return; stopAllContinuous(); state.holdingId=groupId; chip.classList.add('holding'); startContinuousNote(note,groupId); };
+            const endHold=e=>{ e.preventDefault(); if(state.holdingId===groupId){ stopContinuousNote(groupId); chip.classList.remove('holding'); state.holdingId=null; } };
+            chip.addEventListener('mousedown',startHold); chip.addEventListener('mouseup',endHold); chip.addEventListener('mouseleave',endHold);
+            chip.addEventListener('touchstart',startHold,{passive:false}); chip.addEventListener('touchend',endHold,{passive:false}); chip.addEventListener('touchcancel',endHold,{passive:false});
+        });
+        if (state.playerPlayback.lineIdx !== null && state.playerPlayback.expanded !== null) setPlayerProgress(state.playerPlayback.lineIdx, state.playerPlayback.elapsed);
     }
 
     function renderAll() {
@@ -2842,314 +3021,500 @@
     }
 
     // ============================================================
-    // 9. NOTE POPUP LOGIC
+    // 9. NOTE POPUP
     // ============================================================
-    function renderNoteGrid() {
-        let html = '';
-        const octaves = ['3', '4', '5'];
+    let popupLineIdx = null;
+    let popupGroupIdx = null;
+    let popupDetectedNoteId = null;
 
-        for (const oct of octaves) {
-            html += `<div class="octave-label">Октава ${oct}</div>`;
-            html += `<div class="octave-row">`;
-
-            const notesInOctave = state.notes.filter(n => n.endsWith(oct));
-            for (const note of notesInOctave) {
-                const isSelected = state.tempNote === note;
-                html += `<button class="note-btn ${isSelected ? 'selected' : ''}" data-note="${note}">${note}</button>`;
-            }
-
-            html += `</div>`;
-        }
-
-        noteGrid.innerHTML = html;
-
-        noteGrid.querySelectorAll('.note-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const note = btn.dataset.note;
-                state.tempNote = note;
-
-                noteGrid.querySelectorAll('.note-btn').forEach(b => b.classList.remove('selected'));
-                btn.classList.add('selected');
-
-                if (state.editing) {
-                    setGroupNote(state.editing.line, state.editing.group, note);
-                    closeNotePopup();
-                }
-            });
+    function openDetectedNotePopup(lineIdx, noteId) {
+        const line = state.lines[lineIdx];
+        const detected = line?.detectedNotes?.find(n => n.id === noteId);
+        if (!detected) return;
+        popupLineIdx = lineIdx;
+        popupGroupIdx = null;
+        popupDetectedNoteId = noteId;
+        state.tempNote = detected.note;
+        noteGrid.innerHTML = '';
+        const octaveGroups = [
+            { label: 'Мала октава', notes: state.notes.filter(n => n.endsWith('3')) },
+            { label: 'Перша октава', notes: state.notes.filter(n => n.endsWith('4')) },
+            { label: 'Друга октава', notes: state.notes.filter(n => n.endsWith('5')) }
+        ];
+        octaveGroups.forEach(group => {
+            const labelEl=document.createElement('div'); labelEl.className='octave-label'; labelEl.textContent=group.label; noteGrid.appendChild(labelEl);
+            const rowEl=document.createElement('div'); rowEl.className='octave-row';
+            group.notes.forEach(n => { const btn=document.createElement('button'); btn.className='note-btn'; if(n===detected.note)btn.classList.add('selected'); btn.textContent=n.replace(/\d/,''); btn.title=n; btn.addEventListener('click',()=>{ state.tempNote=n; saveNoteAndClose(); }); rowEl.appendChild(btn); });
+            noteGrid.appendChild(rowEl);
         });
+        notePopup.classList.add('open');
     }
 
     function openNotePopup(lineIdx, groupIdx) {
-        state.editing = { line: lineIdx, group: groupIdx };
-        const g = getGroup(lineIdx, groupIdx);
-        state.tempNote = g ? g.note : null;
+        const group = getGroup(lineIdx, groupIdx);
+        if (!group) return;
 
-        renderNoteGrid();
+        popupLineIdx = lineIdx;
+        popupGroupIdx = groupIdx;
+
+        const currentNote = group.note;
+        state.tempNote = currentNote || null;
+
+        noteGrid.innerHTML = '';
+
+        const octaveGroups = [
+            { label: 'Мала октава', notes: state.notes.filter(n => n.endsWith('3')) },
+            { label: 'Перша октава', notes: state.notes.filter(n => n.endsWith('4')) },
+            { label: 'Друга октава', notes: state.notes.filter(n => n.endsWith('5')) }
+        ];
+
+        octaveGroups.forEach(group => {
+            const labelEl = document.createElement('div');
+            labelEl.className = 'octave-label';
+            labelEl.textContent = group.label;
+            noteGrid.appendChild(labelEl);
+
+            const rowEl = document.createElement('div');
+            rowEl.className = 'octave-row';
+
+            group.notes.forEach(n => {
+                const btn = document.createElement('button');
+                btn.className = 'note-btn';
+                if (n === currentNote) btn.classList.add('selected');
+                btn.textContent = n.replace(/\d/, '');
+                btn.title = n;
+                btn.dataset.note = n;
+                btn.addEventListener('click', () => {
+                    state.tempNote = n;
+                    saveNoteAndClose();
+                });
+                rowEl.appendChild(btn);
+            });
+
+            noteGrid.appendChild(rowEl);
+        });
+
         notePopup.classList.add('open');
     }
 
     function closeNotePopup() {
         notePopup.classList.remove('open');
-        state.editing = null;
-        state.tempNote = null;
+        popupLineIdx = null; popupGroupIdx = null; popupDetectedNoteId = null; state.tempNote = null;
     }
 
-    popupClose.addEventListener('click', closeNotePopup);
-
-    popupRemoveNote.addEventListener('click', () => {
-        if (state.editing) {
-            setGroupNote(state.editing.line, state.editing.group, null);
-            closeNotePopup();
+    function saveNoteAndClose() {
+        if (popupDetectedNoteId !== null && popupLineIdx !== null) {
+            const line=state.lines[popupLineIdx]; const detected=line?.detectedNotes?.find(n=>n.id===popupDetectedNoteId);
+            if (detected && state.tempNote) {
+                detected.note = state.tempNote;
+                const links = Array.isArray(detected.groupIdxs) ? detected.groupIdxs : (detected.groupIdx != null ? [detected.groupIdx] : []);
+                links.forEach(gi => {
+                    if (line.groups[gi]) {
+                        line.groups[gi].note = state.tempNote;
+                        line.groups[gi].duration = detected.duration;
+                    }
+                });
+                playNoteOnce(state.tempNote);
+                renderAll();
+            }
+            closeNotePopup(); return;
         }
-    });
+        if (popupLineIdx === null || popupGroupIdx === null) return;
+        setGroupNote(popupLineIdx, popupGroupIdx, state.tempNote); closeNotePopup();
+    }
 
-    notePopup.addEventListener('click', (e) => {
-        if (e.target === notePopup) closeNotePopup();
-    });
+    function removeNoteAndClose() {
+        if (popupDetectedNoteId !== null && popupLineIdx !== null) {
+            const line = state.lines[popupLineIdx];
+            const id = popupDetectedNoteId;
+            if (line) {
+                line.groups.forEach(g => {
+                    const oldIds = groupDetectedIds(g);
+                    if (!oldIds.includes(id)) return;
+                    const ids = oldIds.filter(x => x !== id);
+                    if (ids.length) {
+                        g._detectedNoteIds = ids;
+                        const remaining = ids.map(noteId => line.detectedNotes.find(x => x.id === noteId)).filter(Boolean);
+                        g.note = remaining.length ? remaining[remaining.length - 1].note : null;
+                        g.duration = remaining.reduce((sum, item) => sum + (Number(item.duration) > 0 ? Number(item.duration) : 0.1), 0.6);
+                    } else {
+                        delete g._detectedNoteIds; delete g._detectedNoteId;
+                        g.note = null; g.duration = 0.6;
+                    }
+                });
+                line.detectedNotes = (line.detectedNotes || []).filter(n => n.id !== id);
+                syncDetectedNoteLinks(line);
+                renderAll();
+            }
+            closeNotePopup(); return;
+        }
+        if (popupLineIdx === null || popupGroupIdx === null) return;
+        state.tempNote = null;
+        setGroupNote(popupLineIdx, popupGroupIdx, null);
+        closeNotePopup();
+    }
 
     // ============================================================
-    // 10. URL STATE ENCODING & DECODING
+    // 10. SHARE
     // ============================================================
-    function serializeState() {
-        const compact = state.lines.map(line => {
-            if (line.isEmpty) return null;
+    function getShareData() {
+        const text = lyricsInput.value;
+        return {
+            t: text,
+            g: state.lines.map(line => {
+                if (line.isEmpty) return null;
+                return {
+                    groups: line.groups.map(g => ({
+                        w: g.words,
+                        n: g.note,
+                        d: g.duration || 0.6
+                    })),
+                    notes: (line.detectedNotes || []).map(n => ({
+                        id: n.id,
+                        note: n.note,
+                        d: n.duration,
+                        gi: Array.isArray(n.groupIdxs) ? n.groupIdxs : (n.groupIdx != null ? [n.groupIdx] : [])
+                    }))
+                };
+            })
+        };
+    }
+
+    function loadShareData(data) {
+        lyricsInput.value = data.t;
+        state.lines = data.g.map(lineData => {
+            if (lineData === null) {
+                return { groups: [], isEmpty: true, collapsed: false, detectedNotes: [] };
+            }
+            // New format stores groups + detected notes. Legacy format was a plain groups array.
+            const groupData = Array.isArray(lineData) ? lineData : (lineData.groups || []);
+            const detected = Array.isArray(lineData) ? [] : (lineData.notes || []);
+            const groups = groupData.map(g => ({
+                words: g.w,
+                note: g.n,
+                duration: g.d || 0.6
+            }));
+            const detectedNotes = detected.map((n, i) => ({
+                id: n.id || `n-share-${Date.now()}-${i}`,
+                note: n.note,
+                duration: n.d || 0.6,
+                groupIdxs: Array.isArray(n.gi) ? n.gi.filter(Number.isInteger) : (Number.isInteger(n.gi) ? [n.gi] : [])
+            }));
+            groups.forEach(g => { delete g._detectedNoteIds; delete g._detectedNoteId; });
+            detectedNotes.forEach(n => {
+                n.groupIdxs.forEach(gi => {
+                    if (!groups[gi]) return;
+                    groups[gi]._detectedNoteIds = [n.id];
+                    groups[gi].note = n.note;
+                    groups[gi].duration = n.duration;
+                });
+            });
             return {
-                t: line.rawText ?? line.groups.flatMap(g => g.words).join(' '),
-                g: line.groups.map(g => ({
-                    w: g.words,
-                    n: g.note,
-                    d: g.duration !== 0.6 ? g.duration : undefined,
-                    i: groupDetectedIds(g).length ? groupDetectedIds(g) : undefined
-                })),
-                a: line.audioData || undefined,
-                dn: line.detectedNotes?.length ? line.detectedNotes.map(n => ({ id: n.id, n: n.note, d: n.duration })) : undefined
+                groups,
+                isEmpty: false,
+                rawText: groups.flatMap(g=>g.words).join(' '),
+                collapsed: false,
+                detectedNotes
             };
         });
-
-        try {
-            const json = JSON.stringify(compact);
-            return LZString.compressToEncodedURIComponent(json);
-        } catch (e) {
-            console.error('Encoding failed:', e);
-            return '';
-        }
+        renderAll();
     }
 
-    function deserializeState(hash) {
+    function generateShareUrl() {
+        const data = getShareData();
         try {
-            const json = LZString.decompressFromEncodedURIComponent(hash);
-            if (!json) return null;
-
-            const parsed = JSON.parse(json);
-            if (!Array.isArray(parsed)) return null;
-
-            return parsed.map(line => {
-                if (!line) return { groups: [], isEmpty: true, collapsed: false, detectedNotes: [], rawText: '' };
-                const groups = line.g.map(g => ({
-                    words: g.w,
-                    note: g.n,
-                    duration: g.d || 0.6,
-                    _detectedNoteIds: Array.isArray(g.i) ? g.i : (g.i ? [g.i] : [])
-                }));
-                const detectedNotes = Array.isArray(line.dn) ? line.dn.map(n => ({ id: n.id, note: n.n, duration: n.d, groupIdxs: [] })) : [];
-                const resLine = {
-                    groups: groups,
-                    isEmpty: false,
-                    collapsed: false,
-                    detectedNotes: detectedNotes,
-                    audioData: line.a || null,
-                    rawText: line.t ?? groups.flatMap(g => g.words).join(' ')
-                };
-                syncDetectedNoteLinks(resLine);
-                return resLine;
-            });
+            const json = JSON.stringify(data);
+            const compressed = LZString.compressToEncodedURIComponent(json);
+            return window.location.href.split('#')[0] + '#z' + compressed;
         } catch (e) {
-            console.error('Decoding failed:', e);
+            console.error('Share error:', e);
             return null;
         }
     }
 
-    function updateUrlHash() {
-        if (state.debounceTimer) clearTimeout(state.debounceTimer);
-        state.debounceTimer = setTimeout(() => {
-            const encoded = serializeState();
-            if (encoded) {
-                history.replaceState(null, '', `#data=${encoded}`);
-            } else {
-                history.replaceState(null, '', window.location.pathname);
-            }
-        }, 400);
-    }
-
-    function loadFromUrlHash() {
-        const hash = window.location.hash;
-        if (!hash.startsWith('#data=')) return false;
-
-        const dataStr = hash.replace('#data=', '');
-        const loadedLines = deserializeState(dataStr);
-
-        if (loadedLines) {
-            state.lines = loadedLines;
-            updateTextareaFromState();
-            return true;
-        }
-
-        return false;
-    }
-
-    function shareUrl() {
-        const encoded = serializeState();
-        if (!encoded) {
-            alert('Помилка формування посилання!');
+    function shareFromPlayer() {
+        const url = generateShareUrl();
+        if (!url) {
+            alert('Помилка створення посилання');
             return;
         }
 
-        const url = `${window.location.origin}${window.location.pathname}#data=${encoded}`;
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(() => {
+                showNotification('✅ Посилання скопійовано!');
+            }).catch(() => {
+                fallbackCopy(url);
+            });
+        } else {
+            fallbackCopy(url);
+        }
+    }
 
-        navigator.clipboard.writeText(url).then(() => {
-            shareNotif.classList.add('show');
-            setTimeout(() => shareNotif.classList.remove('show'), 2500);
-        }).catch(() => {
-            prompt('Скопіюйте посилання:', url);
-        });
+    function fallbackCopy(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+            document.execCommand('copy');
+            showNotification('✅ Посилання скопійовано!');
+        } catch (e) {
+            prompt('Скопіюйте посилання вручну:', text);
+        }
+        document.body.removeChild(ta);
+    }
+
+    function showNotification(msg) {
+        shareNotif.textContent = msg;
+        shareNotif.classList.add('show');
+        clearTimeout(shareNotif._hideTimer);
+        shareNotif._hideTimer = setTimeout(() => {
+            shareNotif.classList.remove('show');
+        }, 3000);
     }
 
     // ============================================================
-    // 11. EVENT LISTENERS & INITIALIZATION
+    // 11. URL HASH LOADING
     // ============================================================
-    lyricsInput.addEventListener('input', (e) => {
-        const cleaned = removeLatin(e.target.value);
-        if (cleaned !== e.target.value) {
-            e.target.value = cleaned;
+    function loadFromHash() {
+        const hash = window.location.hash.slice(1);
+        if (!hash) return false;
+        try {
+            let json;
+            if (hash[0] === 'z') {
+                // New compressed format
+                json = LZString.decompressFromEncodedURIComponent(hash.slice(1));
+            } else {
+                // Legacy plain base64 format (old shared links)
+                json = decodeURIComponent(atob(hash));
+            }
+            const data = JSON.parse(json);
+            if (data.t !== undefined && data.g !== undefined) {
+                loadShareData(data);
+                return true;
+            }
+        } catch (e) {
+            console.warn('Failed to load from hash:', e);
         }
-        rebuildGroupsPreservingNotes(e.target.value);
-        renderAll();
-        updateUrlHash();
-    });
+        return false;
+    }
 
-    lyricsInput.addEventListener('paste', (e) => {
-        e.preventDefault();
-        const pastedText = (e.clipboardData || window.clipboardData).getData('text');
-        const cleanedText = cleanLyricsText(pastedText);
+    // ============================================================
+    // 12. UTILITY
+    // ============================================================
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 
-        const start = lyricsInput.selectionStart;
-        const end = lyricsInput.selectionEnd;
-        const currentVal = lyricsInput.value;
-
-        const newVal = currentVal.substring(0, start) + cleanedText + currentVal.substring(end);
-        lyricsInput.value = newVal;
-
-        rebuildGroupsPreservingNotes(newVal);
-        renderAll();
-        updateUrlHash();
-    });
-
-    $('add-line-btn').addEventListener('click', addEmptyLine);
-
-    clearGroupsBtn.addEventListener('click', () => {
-        if (confirm('Очистити весь текст та ноти?')) {
-            clearAllGroups();
-            updateUrlHash();
-        }
-    });
-
-    backToEditorBtn.addEventListener('click', () => {
-        switchTab('editor');
-    });
-
-    shareFromPlayerBtn.addEventListener('click', shareUrl);
-
-    tabBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            switchTab(btn.dataset.tab);
-        });
-    });
-
+    // ============================================================
+    // 13. TAB SWITCHING
+    // ============================================================
     function switchTab(tabName) {
         state.currentTab = tabName;
-
-        tabBtns.forEach(b => {
-            b.classList.toggle('active', b.dataset.tab === tabName);
+        tabBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tabName);
         });
-
         Object.keys(screens).forEach(key => {
             screens[key].classList.toggle('active', key === tabName);
         });
+        renderAll();
+    }
 
+    // ============================================================
+    // 13.5 VOLUME CONTROL
+    // ============================================================
+    function updateVolumeUI(percent) {
+        volValue.textContent = percent + '%';
+        const max = parseInt(volumeSlider.max, 10) || 100;
+        volIcon.textContent = percent == 0 ? '🔇' : (percent < max / 2 ? '🔉' : '🔊');
+    }
+
+    function setVolume(percent) {
+    state.volume = percent / 100;
+
+    if (state.masterGain) {
+        state.masterGain.gain.value = state.volume * 20.0;
+    }
+
+    updateVolumeUI(percent);
+    }
+
+    // ============================================================
+    // 14. INSTRUMENT SELECTOR
+    // ============================================================
+    function setInstrument(instrument) {
+        if (instrument === state.instrument && state.instrumentLoaded) return;
+        
+        state.instrument = instrument;
+        state.instrumentLoaded = false;
         stopAllContinuous();
-        stopLinePlayback();
-
-        if (tabName === 'player') {
-            loadInstrument(state.instrument);
-        }
-
-        renderAll();
-    }
-
-    document.querySelectorAll('.instrument-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const inst = btn.dataset.instrument;
-            state.instrument = inst;
-
-            document.querySelectorAll('.instrument-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-
-            stopAllContinuous();
-            stopLinePlayback();
-
-            loadInstrument(inst);
+        
+        // Update UI
+        document.querySelectorAll('.instrument-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.instrument === instrument);
         });
-    });
-
-    volumeSlider.addEventListener('input', (e) => {
-        const val = parseInt(e.target.value);
-        state.volume = val / 100;
-        volValue.textContent = `${val}%`;
-
-        if (val === 0) volIcon.textContent = '🔇';
-        else if (val < 50) volIcon.textContent = '🔉';
-        else volIcon.textContent = '🔊';
-
-        if (state.masterGain) {
-            state.masterGain.gain.value = state.volume * 2.0;
-        }
-    });
-
-    toggleNotes.addEventListener('change', (e) => {
-        if (e.target.checked) {
-            playerContainer.classList.add('notes-visible');
-        } else {
-            playerContainer.classList.remove('notes-visible');
-        }
-    });
-
-    function escapeHtml(str) {
-        if (!str) return '';
-        return str
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
+        
+        // Load instrument
+        loadInstrument(instrument).then(() => {
+            console.log(`✅ Інструмент "${instrument}" готовий до використання`);
+        }).catch(() => {
+            console.warn(`⚠️ Використовується синтезований звук для "${instrument}"`);
+        });
     }
 
-    const origRenderGroups = renderGroups;
-    renderGroups = function() {
-        origRenderGroups();
-        updateUrlHash();
-    };
-
+    // ============================================================
+    // 15. INIT
+    // ============================================================
     function init() {
-        const loaded = loadFromUrlHash();
+        const loaded = loadFromHash();
+
         if (!loaded) {
-            rebuildGroupsPreservingNotes(lyricsInput.value);
+            lyricsInput.value = '';
+            state.lines = [];
         }
-        renderAll();
+
+        state.lines = (state.lines || []).map(line => ({
+            ...line,
+            detectedNotes: line.detectedNotes || [],
+            notesCollapsed: !!line.notesCollapsed
+        }));
+
+        // Restore saved volume (falls back to the 80% default already in state)
+        try {
+            const savedVolume = localStorage.getItem('vocalTrainerVolume');
+            if (savedVolume !== null) {
+                const v = parseInt(savedVolume, 10);
+                if (!isNaN(v) && v >= 0 && v <= 100) {
+                    state.volume = v / 100;
+                    volumeSlider.value = v;
+                }
+            }
+        } catch (e) {
+            console.warn('Не вдалося прочитати збережену гучність:', e);
+        }
+        updateVolumeUI(volumeSlider.value);
+
+        if (loaded) {
+            // Opened via a share link — jump straight to the exercise screen
+            switchTab('player');
+        } else {
+            renderAll();
+        }
+
+        // Auto-load default instrument
+        loadInstrument('acoustic_grand_piano').then(() => {
+            console.log('✅ Піаніно завантажено');
+        });
+
+        // ---- EVENT LISTENERS ----
+
+        volumeSlider.addEventListener('input', () => {
+            const v = parseInt(volumeSlider.value, 10);
+            setVolume(v);
+            try {
+                localStorage.setItem('vocalTrainerVolume', v);
+            } catch (e) {}
+        });
+
+        toggleNotes.addEventListener('change', () => {
+            playerContainer.classList.toggle('notes-visible', toggleNotes.checked);
+        });
+
+        lyricsInput.addEventListener('input', () => {
+            let cleanedText = removeLatin(lyricsInput.value);
+
+            // Filter Latin letters immediately, including pasted text, while
+            // preserving the caret position as much as possible.
+            if (lyricsInput.value !== cleanedText) {
+                const start = lyricsInput.selectionStart;
+                const cleanedPrefix = cleanLyricsText(lyricsInput.value.slice(0, start));
+                const newCursorPosition = cleanedPrefix.length;
+
+                lyricsInput.value = cleanedText;
+                
+                lyricsInput.setSelectionRange(newCursorPosition, newCursorPosition);
+            }
+
+            // Rebuild immediately so every edit in the main text field is
+            // reflected in the line/group blocks without the old 300 ms delay.
+            rebuildGroupsPreservingNotes(lyricsInput.value);
+            renderAll();
+        });
+
+        tabBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                switchTab(btn.dataset.tab);
+            });
+        });
+
+        $('add-line-btn').addEventListener('click', addEmptyLine);
+        clearGroupsBtn.addEventListener('click', clearAllGroups);
+        groupsContainer.addEventListener('click', (e) => {
+            const btn = e.target.closest('.record-line-btn');
+            if (btn) { e.preventDefault(); e.stopPropagation(); toggleLineRecording(parseInt(btn.dataset.line)); }
+        });
+        backToEditorBtn.addEventListener('click', () => {
+            switchTab('editor');
+        });
+        shareFromPlayerBtn.addEventListener('click', shareFromPlayer);
+
+        popupClose.addEventListener('click', closeNotePopup);
+        popupRemoveNote.addEventListener('click', removeNoteAndClose);
+
+        notePopup.addEventListener('click', (e) => {
+            if (e.target === notePopup) closeNotePopup();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeNotePopup();
+        });
+
+        // Instrument selector
+        document.querySelectorAll('.instrument-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                setInstrument(btn.dataset.instrument);
+            });
+        });
+
+        playerContainer.addEventListener('selectstart', e => e.preventDefault());
+
+        window.addEventListener('resize', () => {
+            groupsContainer.querySelectorAll('[data-notes-visual]').forEach(visual => {
+                renderDetectedNoteConnections(parseInt(visual.dataset.notesVisual), visual);
+            });
+        });
+
+        window.addEventListener('beforeunload', () => {
+            stopAllContinuous();
+            if (state.audioCtx) {
+                state.audioCtx.close();
+            }
+        });
+
+        window.addEventListener('hashchange', () => {
+            const loadedNow = loadFromHash();
+            if (loadedNow) {
+                switchTab('player');
+            } else {
+                renderAll();
+            }
+        });
+
+        console.log('🎵 Вокальний тренер ініціалізовано');
+        console.log('📊 Груп:', state.lines.reduce((acc, l) => acc + (l.isEmpty ? 0 : l.groups.length), 0));
+        console.log('🎹 Поточний інструмент:', state.instrument);
     }
 
-    init();
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 
 })();
 </script>
+
 </body>
 </html>
