@@ -461,6 +461,9 @@
             transition: all 0.2s ease;
             cursor: pointer;
             position: relative;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
             backdrop-filter: blur(8px);
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
         }
@@ -594,6 +597,12 @@
             font-size: 11px;
             cursor: pointer;
         }
+        .record-line-btn.processing { position: relative; pointer-events: none; opacity: .8; overflow: hidden; }
+        .record-line-btn.processing::after { content: ""; position: absolute; left: -35%; top: 0; width: 35%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent); animation: recordProcessing 1.1s linear infinite; }
+        @keyframes recordProcessing { from { left: -35%; } to { left: 100%; } }
+        .record-status.processing::after { content: ""; display: inline-block; width: 10px; height: 10px; margin-left: 7px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; vertical-align: -1px; animation: recordSpin .7s linear infinite; }
+        @keyframes recordSpin { to { transform: rotate(360deg); } }
+
         .line-notes-toggle:hover,
         .clear-line-notes-btn:hover,
         .record-line-btn:hover {
@@ -2314,28 +2323,28 @@
     function detectOnsets(raw, hopDur) {
         const onsets = new Set();
         const smooth = smoothEnvelope(raw.map(r => r.rms), Math.max(5, Math.round(0.04 / hopDur)));
-        const lookback = Math.max(5, Math.round(0.12 / hopDur));
-        const refractory = Math.max(4, Math.round(0.12 / hopDur));
+        const lookback = Math.max(8, Math.round(0.16 / hopDur));
+        const refractory = Math.max(6, Math.round(0.16 / hopDur));
         let lastOnset = -Infinity;
 
-        // A genuine re-articulation must contain a meaningful energy valley
-        // before the rise. Looking only for a rise makes a steady note with
-        // small recording/AGC fluctuations look like several notes.
-        for (let i = 1; i < smooth.length; i++) {
+        // Only split a note on an energy attack when there is a genuinely
+        // deep valley immediately before it. Small level changes inside a
+        // sustained tone are deliberately ignored; they were the main source
+        // of artificial extra segments in otherwise steady recordings.
+        for (let i = 2; i < smooth.length; i++) {
             if (i - lastOnset < refractory) continue;
             const from = Math.max(0, i - lookback);
             let localMin = Infinity;
-            let localMinIndex = from;
+            let localMax = 0;
             for (let k = from; k < i; k++) {
-                if (smooth[k] < localMin) {
-                    localMin = smooth[k];
-                    localMinIndex = k;
-                }
+                localMin = Math.min(localMin, smooth[k]);
+                localMax = Math.max(localMax, smooth[k]);
             }
-            if (localMinIndex >= i - Math.max(2, Math.round(0.02 / hopDur))) continue;
-            const rise = smooth[i] - localMin;
-            const ratio = smooth[i] / Math.max(localMin, 1e-6);
-            if (rise > 0.055 && ratio > 2.8) {
+            const recentMin = Math.min(...smooth.slice(Math.max(from, i - Math.max(3, Math.round(0.06 / hopDur))), i));
+            const rise = smooth[i] - recentMin;
+            const valleyRatio = localMax > 1e-6 ? recentMin / localMax : 1;
+            const ratio = smooth[i] / Math.max(recentMin, 1e-6);
+            if (valleyRatio < 0.48 && rise > 0.045 && ratio > 2.0) {
                 onsets.add(i);
                 lastOnset = i;
             }
@@ -2435,7 +2444,7 @@
 
         // ~17ms hold (3 hops) — long enough to absorb boundary dither on a
         // sustained note, short enough to still catch genuinely fast notes.
-        const notes = quantizeNotesWithHysteresis(raw.map(r => r.freq), 3);
+        const notes = quantizeNotesWithHysteresis(raw.map(r => r.freq), 5);
         const onsets = detectOnsets(raw, hopDur);
 
         const segments = [];
@@ -2447,6 +2456,11 @@
             const bridgeableGap = last && (raw[i].t - last.end) < 0.06;
             if (sameNote && bridgeableGap && !onsets.has(i)) {
                 last.end = raw[i].t + hopDur;
+            } else if (sameNote && bridgeableGap && onsets.has(i)) {
+                // An onset can create a new articulation of the same pitch.
+                // Keep it only when the energy valley is deep enough;
+                // detectOnsets already enforces that condition.
+                segments.push({ note, start: raw[i].t, end: raw[i].t + hopDur });
             } else {
                 segments.push({ note, start: raw[i].t, end: raw[i].t + hopDur });
             }
@@ -2495,6 +2509,8 @@
         const audioData = { type: mimeType, base64: arrayBufferToBase64(await blob.arrayBuffer()) };
         const status = groupsContainer.querySelector(`[data-record-status="${lineIdx}"]`);
         if (status) { status.textContent = 'Аналіз висоти та тривалості нот…'; status.classList.add('processing'); }
+        const processingBtn = groupsContainer.querySelector(`.record-line-btn[data-line="${lineIdx}"]`);
+        if (processingBtn) { processingBtn.textContent = '⏳ Аналіз…'; processingBtn.classList.remove('btn-danger'); processingBtn.classList.add('processing'); }
         try {
             const detectedNotes = await analyzeRecordedPitch(blob);
             const line = state.lines[lineIdx];
@@ -2524,6 +2540,7 @@
             console.error('Audio analysis error:', e);
             const line = state.lines[lineIdx];
             if (line) line.audioData = audioData;
+            if (processingBtn) { processingBtn.textContent = '🎙 Запис аудіо'; processingBtn.classList.remove('processing'); }
             renderAll();
             alert('Запис збережено, але автоматично визначити ноти не вдалося. Спробуйте ще раз у тихішому місці.');
         }
@@ -2663,54 +2680,7 @@
     }
 
     function setupGroupReverseDrag(lineIdx, chip, visual) {
-        let drag = null;
-        let suppressClick = false;
-        const clearTargets = () => visual.querySelectorAll('.reverse-drop-target').forEach(el => el.classList.remove('reverse-drop-target'));
-
-        const cleanup = () => {
-            clearTargets();
-            if (drag?.ghost) drag.ghost.remove();
-            chip.classList.remove('drag-source');
-            try { if (drag?.pointerId != null) chip.releasePointerCapture(drag.pointerId); } catch (_) {}
-            drag = null;
-        };
-
-        const onMove = e => {
-            if (!drag) return;
-            const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
-            if (!drag.moved && Math.hypot(dx, dy) < 6) return;
-            drag.moved = true;
-            e.preventDefault();
-            drag.ghost.style.left = `${e.clientX - drag.offsetX}px`;
-            drag.ghost.style.top = `${e.clientY - drag.offsetY}px`;
-            clearTargets();
-            const under = document.elementFromPoint(e.clientX, e.clientY);
-            const noteEl = under?.closest?.('.detected-note');
-            if (!noteEl || noteEl.closest('.line-block')?.dataset.line !== String(lineIdx)) return;
-            const groupIdx = parseInt(chip.dataset.group, 10);
-            const noteId = noteEl.dataset.noteId;
-            const group = state.lines[lineIdx]?.groups?.[groupIdx];
-            if (group && groupDetectedIds(group).includes(noteId)) noteEl.classList.add('reverse-drop-target');
-        };
-
-        const finish = e => {
-            if (!drag) return;
-            const wasMoved = drag.moved;
-            const under = document.elementFromPoint(e.clientX, e.clientY);
-            const noteEl = under?.closest?.('.detected-note');
-            const groupIdx = parseInt(chip.dataset.group, 10);
-            const line = state.lines[lineIdx];
-            const group = line?.groups?.[groupIdx];
-            const validTarget = wasMoved && noteEl &&
-                noteEl.closest('.line-block')?.dataset.line === String(lineIdx) &&
-                group && groupDetectedIds(group).includes(noteEl.dataset.noteId);
-
-            cleanup();
-            if (wasMoved) suppressClick = true;
-            if (validTarget) detachDetectedNote(lineIdx, noteEl.dataset.noteId, groupIdx);
-            setTimeout(() => { suppressClick = false; }, 0);
-        };
-
+        if (!chip || !visual) return;
         chip.addEventListener('pointerdown', e => {
             if (e.button !== undefined && e.button !== 0) return;
             if (e.target.closest('.action-btn, .note-badge')) return;
@@ -2718,35 +2688,58 @@
             const groupIdx = parseInt(chip.dataset.group, 10);
             const group = line?.groups?.[groupIdx];
             if (!group || !groupDetectedIds(group).length) return;
-
+            e.preventDefault();
+            e.stopPropagation();
+            chip.style.touchAction = 'none';
             const r = chip.getBoundingClientRect();
             const ghost = chip.cloneNode(true);
             ghost.classList.add('group-drag-ghost');
-            Object.assign(ghost.style, {
-                position:'fixed', left:`${r.left}px`, top:`${r.top}px`, width:`${r.width}px`,
-                margin:'0', pointerEvents:'none', zIndex:'9999'
-            });
+            ghost.style.position = 'fixed';
+            ghost.style.left = `${r.left}px`;
+            ghost.style.top = `${r.top}px`;
+            ghost.style.width = `${r.width}px`;
+            ghost.style.pointerEvents = 'none';
+            ghost.style.zIndex = '10000';
             document.body.appendChild(ghost);
             chip.classList.add('drag-source');
-            e.preventDefault();
-            e.stopPropagation();
             try { chip.setPointerCapture(e.pointerId); } catch (_) {}
-            drag = {
-                startX:e.clientX, startY:e.clientY,
-                offsetX:e.clientX-r.left, offsetY:e.clientY-r.top,
-                moved:false, ghost, pointerId:e.pointerId
+            const pointerId = e.pointerId;
+            let moved = false;
+            const clearTargets = () => visual.querySelectorAll('.reverse-drop-target').forEach(el => el.classList.remove('reverse-drop-target'));
+            const move = ev => {
+                if (ev.pointerId !== pointerId) return;
+                const dx = ev.clientX - e.clientX, dy = ev.clientY - e.clientY;
+                if (!moved && Math.hypot(dx,dy) < 5) return;
+                moved = true;
+                ev.preventDefault();
+                ghost.style.left = `${ev.clientX - (r.width/2)}px`;
+                ghost.style.top = `${ev.clientY - (r.height/2)}px`;
+                clearTargets();
+                const under = document.elementFromPoint(ev.clientX, ev.clientY);
+                const noteEl = under?.closest?.('.detected-note');
+                if (noteEl && noteEl.closest('.line-block')?.dataset.line === String(lineIdx) && groupDetectedIds(group).includes(noteEl.dataset.noteId)) {
+                    noteEl.classList.add('reverse-drop-target');
+                }
             };
-        });
-
-        chip.addEventListener('pointermove', onMove);
-        chip.addEventListener('pointerup', finish);
-        chip.addEventListener('pointercancel', finish);
-        chip.addEventListener('click', e => {
-            if (suppressClick) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-        }, true);
+            const finish = ev => {
+                if (ev.pointerId !== pointerId) return;
+                document.removeEventListener('pointermove', move, true);
+                document.removeEventListener('pointerup', finish, true);
+                document.removeEventListener('pointercancel', finish, true);
+                clearTargets();
+                ghost.remove();
+                chip.classList.remove('drag-source');
+                try { chip.releasePointerCapture(pointerId); } catch (_) {}
+                const under = document.elementFromPoint(ev.clientX, ev.clientY);
+                const noteEl = under?.closest?.('.detected-note');
+                if (moved && noteEl && noteEl.closest('.line-block')?.dataset.line === String(lineIdx) && groupDetectedIds(group).includes(noteEl.dataset.noteId)) {
+                    detachDetectedNote(lineIdx, noteEl.dataset.noteId, groupIdx);
+                }
+            };
+            document.addEventListener('pointermove', move, true);
+            document.addEventListener('pointerup', finish, true);
+            document.addEventListener('pointercancel', finish, true);
+        }, { passive: false });
     }
 
     function renderDetectedNoteConnections(lineIdx, visual) {
@@ -3040,8 +3033,8 @@
             html += `<input type="text" class="line-text-input" data-line="${li}" placeholder="Текст рядка">`;
             const notes = line.detectedNotes || [];
             html += `<div class="record-actions">`;
-            html += `<button class="record-line-btn" data-line="${li}" type="button">🎙 Додати аудіо</button>`;
-            html += `<button class="clear-line-notes-btn" data-clear-line-notes="${li}" type="button">🗑 Видалити всі ноти</button>`;
+            html += `<button class="record-line-btn" data-line="${li}" type="button">🎙 Запис аудіо</button>`;
+            html += `<button class="clear-line-notes-btn" data-clear-line-notes="${li}" type="button">🗑 Ноти</button>`;
             html += `<button class="line-notes-toggle" data-toggle-notes="${li}" type="button">♫ Ноти${notes.length ? ` (${notes.length})` : ''} ${line.notesCollapsed ? '▸' : '▾'}</button>`;
             if (line.audioData) html += `<span class="line-audio-badge">● Аудіо проаналізовано</span>`;
             html += `<span class="record-status" data-record-status="${li}"></span>`;
