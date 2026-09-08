@@ -2285,6 +2285,26 @@
             confidence = 1 - cmndf[tauEstimate];
         }
 
+        // 3b) Octave-error correction. YIN takes the FIRST lag whose CMNDF
+        // dips below the threshold. When a tone has strong 2nd-harmonic
+        // energy, that shallow dip can occur at roughly half the true
+        // period (i.e. double the frequency) before the deeper dip at the
+        // real fundamental is reached — the classic "note detected an
+        // octave too high" failure. If a candidate near double the chosen
+        // lag is an equally (or more) convincing periodicity minimum, that
+        // longer lag is the true fundamental — prefer it.
+        const octaveLag = tauEstimate * 2;
+        if (octaveLag <= clampedMaxLag) {
+            let bestOctaveTau = -1, bestOctaveVal = Infinity;
+            for (let tau = Math.max(minLag, octaveLag - 2); tau <= Math.min(clampedMaxLag, octaveLag + 2); tau++) {
+                if (cmndf[tau] < bestOctaveVal) { bestOctaveVal = cmndf[tau]; bestOctaveTau = tau; }
+            }
+            if (bestOctaveTau !== -1 && bestOctaveVal < YIN_THRESHOLD && bestOctaveVal <= cmndf[tauEstimate] * 1.15) {
+                tauEstimate = bestOctaveTau;
+                confidence = 1 - bestOctaveVal;
+            }
+        }
+
         // 4) Parabolic interpolation around tauEstimate for sub-sample precision.
         let betterTau = tauEstimate;
         const lo = Math.max(minLag, tauEstimate - 1);
