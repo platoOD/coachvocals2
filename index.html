@@ -2687,7 +2687,50 @@
         chip.style.webkitUserSelect = 'none';
 
         let drag = null;
-        const clearTargets = () => visual.querySelectorAll('.reverse-drop-target').forEach(el => el.classList.remove('reverse-drop-target'));
+        let holdTimer = null;
+        let pending = null;
+        let suppressClick = false;
+        const HOLD_MS = 1000;
+        const MOVE_CANCEL_PX = 8;
+
+        const clearTargets = () => visual.querySelectorAll('.reverse-drop-target')
+            .forEach(el => el.classList.remove('reverse-drop-target'));
+
+        const cancelPending = () => {
+            if (holdTimer) {
+                clearTimeout(holdTimer);
+                holdTimer = null;
+            }
+            pending = null;
+        };
+
+        const startDrag = (e, info) => {
+            const r = chip.getBoundingClientRect();
+            const offsetX = e.clientX - r.left;
+            const offsetY = e.clientY - r.top;
+            const ghost = chip.cloneNode(true);
+            ghost.classList.add('group-drag-ghost');
+            Object.assign(ghost.style, {
+                position: 'fixed', left: `${r.left}px`, top: `${r.top}px`,
+                width: `${r.width}px`, pointerEvents: 'none', zIndex: '10000'
+            });
+            document.body.appendChild(ghost);
+            chip.classList.add('drag-source');
+
+            drag = {
+                pointerId: e.pointerId,
+                startX: info.startX,
+                startY: info.startY,
+                offsetX, offsetY, ghost,
+                moved: false,
+                groupIdx: info.groupIdx,
+                linkedIds: info.linkedIds.slice()
+            };
+            pending = null;
+            holdTimer = null;
+            suppressClick = true;
+            try { chip.setPointerCapture(e.pointerId); } catch (_) {}
+        };
 
         chip.addEventListener('pointerdown', e => {
             if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -2701,27 +2744,35 @@
 
             e.preventDefault();
             e.stopPropagation();
+            cancelPending();
 
-            const r = chip.getBoundingClientRect();
-            const offsetX = e.clientX - r.left;
-            const offsetY = e.clientY - r.top;
-            const ghost = chip.cloneNode(true);
-            ghost.classList.add('group-drag-ghost');
-            Object.assign(ghost.style, {
-                position: 'fixed', left: `${r.left}px`, top: `${r.top}px`,
-                width: `${r.width}px`, pointerEvents: 'none', zIndex: '10000'
-            });
-            document.body.appendChild(ghost);
-            chip.classList.add('drag-source');
+            pending = {
+                pointerId: e.pointerId,
+                startX: e.clientX,
+                startY: e.clientY,
+                groupIdx,
+                linkedIds: linkedIds.slice()
+            };
 
-            drag = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, offsetX, offsetY, r, ghost, moved: false, groupIdx, linkedIds: linkedIds.slice() };
-            try { chip.setPointerCapture(e.pointerId); } catch (_) {}
+            // The group becomes draggable only after a deliberate 1-second hold.
+            holdTimer = setTimeout(() => {
+                if (!pending || pending.pointerId !== e.pointerId || drag) return;
+                startDrag(e, pending);
+            }, HOLD_MS);
         }, { passive: false });
 
-        chip.addEventListener('pointermove', e => {
+        const onPointerMove = e => {
+            if (pending && e.pointerId === pending.pointerId && !drag) {
+                const dx = e.clientX - pending.startX;
+                const dy = e.clientY - pending.startY;
+                if (Math.hypot(dx, dy) > MOVE_CANCEL_PX) cancelPending();
+                return;
+            }
+
             if (!drag || e.pointerId !== drag.pointerId) return;
-            const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
-            if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+            const dx = e.clientX - drag.startX;
+            const dy = e.clientY - drag.startY;
+            if (!drag.moved && Math.hypot(dx, dy) < 2) return;
             drag.moved = true;
             e.preventDefault();
             drag.ghost.style.left = `${e.clientX - drag.offsetX}px`;
@@ -2729,10 +2780,16 @@
             clearTargets();
             const under = document.elementFromPoint(e.clientX, e.clientY);
             const strip = under?.closest?.('.line-notes-strip');
-            if (strip && strip.closest('.line-block')?.dataset.line === String(lineIdx)) strip.classList.add('reverse-drop-target');
-        }, { passive: false });
+            if (strip && strip.closest('.line-block')?.dataset.line === String(lineIdx)) {
+                strip.classList.add('reverse-drop-target');
+            }
+        };
 
         const finish = e => {
+            if (pending && e.pointerId === pending.pointerId && !drag) {
+                cancelPending();
+                return;
+            }
             if (!drag || e.pointerId !== drag.pointerId) return;
             const d = drag;
             drag = null;
@@ -2745,10 +2802,22 @@
             const under = document.elementFromPoint(e.clientX, e.clientY);
             const strip = under?.closest?.('.line-notes-strip');
             const validStrip = strip && strip.closest('.line-block')?.dataset.line === String(lineIdx);
-            if (d.moved && validStrip) d.linkedIds.forEach(noteId => detachDetectedNote(lineIdx, noteId, d.groupIdx));
+            if (d.moved && validStrip) {
+                d.linkedIds.forEach(noteId => detachDetectedNote(lineIdx, noteId, d.groupIdx));
+            }
         };
-        chip.addEventListener('pointerup', finish, { passive: false });
-        chip.addEventListener('pointercancel', finish, { passive: false });
+
+        document.addEventListener('pointermove', onPointerMove, { passive: false });
+        document.addEventListener('pointerup', finish, { passive: false });
+        document.addEventListener('pointercancel', finish, { passive: false });
+
+        chip.addEventListener('click', e => {
+            if (suppressClick) {
+                e.preventDefault();
+                e.stopPropagation();
+                suppressClick = false;
+            }
+        }, true);
     }
 
     function renderDetectedNoteConnections(lineIdx, visual) {
