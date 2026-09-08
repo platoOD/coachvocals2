@@ -400,6 +400,14 @@
 
         .line-block-body {
             padding: 0 14px 14px;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* Text selection remains available only in the editable row field. */
+        .line-text-input {
+            user-select: text;
+            -webkit-user-select: text;
         }
 
         .line-block.collapsed .line-block-body {
@@ -576,7 +584,8 @@
         }
         .record-actions > * { flex: 0 0 auto; }
         .line-notes-toggle,
-        .clear-line-notes-btn {
+        .clear-line-notes-btn,
+        .record-line-btn {
             border: 1px solid var(--glass-border);
             background: var(--glass);
             color: var(--text-mid);
@@ -586,7 +595,8 @@
             cursor: pointer;
         }
         .line-notes-toggle:hover,
-        .clear-line-notes-btn:hover {
+        .clear-line-notes-btn:hover,
+        .record-line-btn:hover {
             color: var(--text-hi);
             border-color: var(--accent);
         }
@@ -629,21 +639,24 @@
         .detected-note.dragging,
         .detected-note.drag-source {
             cursor: grabbing;
-            pointer-events: none;
             opacity: .88;
             transform: scale(1.08);
             z-index: 20;
-        }
-        .detected-note-duration {
-            margin-left: 3px;
-            font-size: 9px;
-            opacity: .65;
-            font-weight: 500;
         }
         .chip.note-drop-target {
             border-color: var(--accent);
             box-shadow: 0 0 0 2px var(--accent-soft), 0 0 18px rgba(52,229,192,.25);
             transform: translateY(-2px);
+        }
+        .detected-note.reverse-drop-target {
+            border-color: var(--warn);
+            box-shadow: 0 0 0 2px var(--warn-soft), 0 0 18px rgba(251,191,36,.25);
+            transform: translateY(-2px);
+        }
+        .group-drag-ghost {
+            opacity: .92;
+            pointer-events: none;
+            box-shadow: 0 6px 20px rgba(0,0,0,.28);
         }
         .line-notes-empty {
             color: var(--text-low);
@@ -1070,6 +1083,7 @@
         .player-line-head { display:flex; align-items:center; gap:8px; }
         .player-line-play { width:32px; height:32px; border-radius:50%; border:1px solid var(--glass-border); background:var(--glass); color:var(--text-hi); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:transform .2s, background .2s, border-color .2s; flex-shrink:0; }
         .player-line-play.expanded { transform:rotate(90deg); background:var(--accent-soft); border-color:var(--accent); color:var(--accent); }
+        .player-line-play:disabled { opacity:.35; cursor:not-allowed; transform:none; }
         .player-line-player { margin-top:10px; padding:10px; border:1px solid var(--glass-border); border-radius:14px; background:rgba(255,255,255,.025); }
         .player-track { position:relative; width:100%; height:8px; border-radius:8px; background:rgba(255,255,255,.1); cursor:pointer; touch-action:none; }
         .player-track-progress { position:absolute; left:0; top:0; bottom:0; width:0; border-radius:8px; background:var(--accent); pointer-events:none; }
@@ -1544,11 +1558,10 @@
                 gain: 1.4,
                 release: 0.15
             });
-            // Hard safety cutoff: some soundfont samples keep ringing past the
-            // scheduled duration/release, so force-stop the voice no later
-            // than 1 second in total regardless.
+            // Safety cutoff follows the stored melody duration. Do NOT cap it
+            // at one second: recorded notes may legitimately be longer than 1s.
             if (note && typeof note.stop === 'function') {
-                const hardStopMs = Math.min(duration * 1000 + 150, 1000);
+                const hardStopMs = Math.max(100, duration * 1000 + 180);
                 setTimeout(() => {
                     try { note.stop(); } catch (e) {}
                 }, hardStopMs);
@@ -1767,8 +1780,11 @@
             return '';
         }
 
-        // Normalize excessive whitespace introduced by chord columns.
-        return cleaned.replace(/[ \t]+/g, ' ').trim();
+        // Keep the user's own spacing/indentation intact. Only Latin letters
+        // and disallowed characters are stripped above; whitespace the user
+        // actually typed (including repeated spaces/tabs and leading or
+        // trailing spaces) must not be collapsed or trimmed here.
+        return cleaned;
     }
 
     function cleanLyricsText(text) {
@@ -1990,12 +2006,14 @@
             delete n.groupIdx;
         });
         line.groups.forEach((g, gi) => {
-            const ids = groupDetectedIds(g);
+            const ids = groupDetectedIds(g).filter((id, index, arr) => arr.indexOf(id) === index);
             if (!ids.length) return;
-            g._detectedNoteIds = [ids[0]];
+            g._detectedNoteIds = ids;
             delete g._detectedNoteId;
-            const n = notes.find(x => x.id === ids[0]);
-            if (n) n.groupIdxs.push(gi);
+            ids.forEach(id => {
+                const n = notes.find(x => x.id === id);
+                if (n && !n.groupIdxs.includes(gi)) n.groupIdxs.push(gi);
+            });
         });
     }
 
@@ -2053,10 +2071,20 @@
         const body = lineBlock.querySelector('.line-block-body');
         if (!body) return;
 
+        // Word groups can move or resize on every keystroke here, but this
+        // function intentionally skips the full renderGroups() pass (to
+        // keep the caret/focus stable) — so the connection lines must be
+        // recomputed explicitly, or they stay drawn at stale positions.
+        const visual = lineBlock.querySelector(`.line-notes-visual[data-notes-visual="${lineIdx}"]`);
+        const refreshConnections = () => {
+            if (visual) requestAnimationFrame(() => renderDetectedNoteConnections(lineIdx, visual));
+        };
+
         let chips = body.querySelector('.chips');
 
         if (!line.groups.length) {
             if (chips) chips.remove();
+            refreshConnections();
             return;
         }
 
@@ -2109,6 +2137,7 @@
         });
 
         groupCount.textContent = `${state.lines.reduce((sum, currentLine) => sum + (currentLine.isEmpty ? 0 : currentLine.groups.length), 0)} груп`;
+        refreshConnections();
     }
 
     // Applies an edit made directly in a single line block's own text field:
@@ -2161,45 +2190,304 @@
         return bestDiff <= 1.2 ? best : null;
     }
 
-    function detectPitchAutocorrelation(buffer, sampleRate, start, size) {
-        let rms = 0;
-        for (let i = 0; i < size; i++) rms += buffer[start + i] * buffer[start + i];
-        rms = Math.sqrt(rms / size);
-        if (rms < 0.012) return null;
-        const minLag = Math.max(1, Math.floor(sampleRate / 1100));
-        const maxLag = Math.min(Math.floor(sampleRate / 70), size - 2);
-        let bestLag = -1, best = 0;
-        for (let lag = minLag; lag <= maxLag; lag++) {
-            let corr = 0;
-            for (let i = 0; i < size - lag; i++) corr += buffer[start + i] * buffer[start + i + lag];
-            if (corr > best) { best = corr; bestLag = lag; }
-        }
-        if (bestLag < 0) return null;
-        const freq = sampleRate / bestLag;
-        return frequencyToNearestNote(freq);
+    // ------------------------------------------------------------------
+    // Pitch detection: YIN algorithm (difference function + cumulative
+    // mean normalization + parabolic interpolation) instead of a plain
+    // unnormalized autocorrelation peak-pick. This removes most octave
+    // errors and gives sub-cent frequency accuracy, which in turn makes
+    // note boundaries far more reliable for fast passages.
+    // ------------------------------------------------------------------
+    const YIN_THRESHOLD = 0.18; // lower = stricter about periodicity
+
+    // Restrict the search range to the app's actual usable note range
+    // (with a little headroom) instead of a fixed 70-1100 Hz window.
+    // Narrower range = faster analysis AND fewer stray octave picks.
+    function getPitchSearchRange(sampleRate) {
+        const freqs = (state.notes && state.notes.length ? state.notes : Object.keys(noteFreq))
+            .map(n => noteFreq[n]).filter(Boolean);
+        const minF = Math.max(55, Math.min(...freqs) * 0.85);
+        const maxF = Math.min(sampleRate / 2.2, Math.max(...freqs) * 1.2);
+        const minLag = Math.max(2, Math.floor(sampleRate / maxF));
+        const maxLag = Math.floor(sampleRate / minF);
+        return { minLag, maxLag };
     }
 
+    function windowRms(data, start, size) {
+        let sum = 0;
+        const end = Math.min(data.length, start + size);
+        const n = Math.max(1, end - start);
+        for (let i = start; i < end; i++) sum += data[i] * data[i];
+        return Math.sqrt(sum / n);
+    }
+
+    // Returns { freq, confidence } for one analysis window, or null if
+    // the window is silent/unvoiced.
+    function detectPitchYIN(buffer, sampleRate, start, size, minLag, maxLag) {
+        let rms = 0;
+        for (let i = 0; i < size; i++) { const v = buffer[start + i]; rms += v * v; }
+        rms = Math.sqrt(rms / size);
+        if (rms < 0.008) return null; // silence gate (lower than before to keep quiet fast notes)
+
+        const clampedMaxLag = Math.min(maxLag, size - 2);
+        if (clampedMaxLag <= minLag) return null;
+
+        // 1) Difference function d(tau)
+        const diff = new Float32Array(clampedMaxLag + 1);
+        for (let tau = minLag; tau <= clampedMaxLag; tau++) {
+            let sum = 0;
+            const n = size - tau;
+            for (let i = 0; i < n; i++) {
+                const d = buffer[start + i] - buffer[start + i + tau];
+                sum += d * d;
+            }
+            diff[tau] = sum;
+        }
+
+        // 2) Cumulative mean normalized difference function (CMNDF)
+        const cmndf = new Float32Array(clampedMaxLag + 1);
+        cmndf[minLag] = 1;
+        let runningSum = 0;
+        for (let tau = minLag; tau <= clampedMaxLag; tau++) {
+            runningSum += diff[tau];
+            cmndf[tau] = diff[tau] * (tau - minLag + 1) / (runningSum || 1e-9);
+        }
+
+        // 3) Absolute threshold: first local minimum below YIN_THRESHOLD.
+        let tauEstimate = -1;
+        for (let tau = minLag + 1; tau < clampedMaxLag; tau++) {
+            if (cmndf[tau] < YIN_THRESHOLD) {
+                while (tau + 1 <= clampedMaxLag && cmndf[tau + 1] < cmndf[tau]) tau++;
+                tauEstimate = tau;
+                break;
+            }
+        }
+        let confidence;
+        if (tauEstimate === -1) {
+            // No clean dip found — fall back to the global minimum but mark
+            // it low-confidence (still useful for legato glides/vibrato).
+            let minVal = Infinity;
+            for (let tau = minLag; tau <= clampedMaxLag; tau++) {
+                if (cmndf[tau] < minVal) { minVal = cmndf[tau]; tauEstimate = tau; }
+            }
+            confidence = 1 - Math.min(1, minVal);
+            if (confidence < 0.35) return null;
+        } else {
+            confidence = 1 - cmndf[tauEstimate];
+        }
+
+        // 4) Parabolic interpolation around tauEstimate for sub-sample precision.
+        let betterTau = tauEstimate;
+        const lo = Math.max(minLag, tauEstimate - 1);
+        const hi = Math.min(clampedMaxLag, tauEstimate + 1);
+        const t0 = cmndf[lo], t1 = cmndf[tauEstimate], t2 = cmndf[hi];
+        const denom = (t0 - 2 * t1 + t2);
+        if (denom !== 0) betterTau = tauEstimate + 0.5 * (t0 - t2) / denom;
+        if (betterTau <= 0) betterTau = tauEstimate;
+
+        return { freq: sampleRate / betterTau, confidence };
+    }
+
+    // A single hop (a handful of ms) is shorter than one waveform cycle for
+    // most notes, so raw per-hop RMS wobbles even for a perfectly steady,
+    // evenly-played tone (vibrato, bow noise, breath). Smoothing over a few
+    // hops removes that wobble so onset picking only reacts to genuine
+    // attacks, not to sustain noise on an otherwise constant note.
+    function smoothEnvelope(values, windowHops) {
+        const half = Math.floor(windowHops / 2);
+        const out = new Array(values.length);
+        for (let i = 0; i < values.length; i++) {
+            let sum = 0, n = 0;
+            for (let k = Math.max(0, i - half); k <= Math.min(values.length - 1, i + half); k++) { sum += values[k]; n++; }
+            out[i] = sum / n;
+        }
+        return out;
+    }
+
+    // Energy-based onset picking: flags hops where loudness jumps up
+    // noticeably right after a real dip. This catches re-articulated fast
+    // notes even when the pitch doesn't change (e.g. two repeated staccato
+    // eighth notes on the same pitch), which a pure pitch-based
+    // segmentation would otherwise merge into a single long note.
+    // Deliberately conservative: a note played evenly should never trigger
+    // this, so the bar for what counts as a "real dip" is high, and a
+    // refractory period stops one attack from firing more than once.
+    function detectOnsets(raw, hopDur) {
+        const onsets = new Set();
+        const smooth = smoothEnvelope(raw.map(r => r.rms), Math.max(5, Math.round(0.04 / hopDur)));
+        const lookback = Math.max(5, Math.round(0.12 / hopDur));
+        const refractory = Math.max(4, Math.round(0.12 / hopDur));
+        let lastOnset = -Infinity;
+
+        // A genuine re-articulation must contain a meaningful energy valley
+        // before the rise. Looking only for a rise makes a steady note with
+        // small recording/AGC fluctuations look like several notes.
+        for (let i = 1; i < smooth.length; i++) {
+            if (i - lastOnset < refractory) continue;
+            const from = Math.max(0, i - lookback);
+            let localMin = Infinity;
+            let localMinIndex = from;
+            for (let k = from; k < i; k++) {
+                if (smooth[k] < localMin) {
+                    localMin = smooth[k];
+                    localMinIndex = k;
+                }
+            }
+            if (localMinIndex >= i - Math.max(2, Math.round(0.02 / hopDur))) continue;
+            const rise = smooth[i] - localMin;
+            const ratio = smooth[i] / Math.max(localMin, 1e-6);
+            if (rise > 0.055 && ratio > 2.8) {
+                onsets.add(i);
+                lastOnset = i;
+            }
+        }
+        return onsets;
+    }
+
+    // Turning a wobbling frequency into a fixed set of notes means picking a
+    // boundary between neighbouring notes. A perfectly evenly played note
+    // still drifts a few cents from vibrato, breath or bow noise, and if
+    // that drift crosses the boundary it gets quantized to the neighbouring
+    // note for a hop or two — which used to show up as a spurious extra
+    // note. Hysteresis fixes this: once a note is "locked in", a different
+    // candidate note must persist for several consecutive hops before it's
+    // allowed to take over, so brief boundary dither is absorbed instead of
+    // becoming a new note. Genuine fast note changes are unaffected because
+    // they persist far longer than the hold time.
+    function quantizeNotesWithHysteresis(freqs, holdHops) {
+        const out = new Array(freqs.length).fill(null);
+        let current = null;
+        let candidate = null;
+        let candidateRun = 0;
+
+        for (let i = 0; i < freqs.length; i++) {
+            const note = frequencyToNearestNote(freqs[i]);
+
+            if (note === null) {
+                // A brief unvoiced frame must not manufacture a new note.
+                // Keep the current note alive; segment merging later decides
+                // whether the gap is actually a pause.
+                candidate = null;
+                candidateRun = 0;
+                out[i] = current;
+                continue;
+            }
+
+            if (current === null) {
+                if (note === candidate) candidateRun++;
+                else { candidate = note; candidateRun = 1; }
+                if (candidateRun >= holdHops) {
+                    current = candidate;
+                    candidate = null;
+                    candidateRun = 0;
+                }
+                // Do not expose an unconfirmed pitch. This is the important
+                // difference from the previous implementation, which emitted
+                // the raw candidate immediately and could create short false
+                // notes from one or two YIN outliers.
+                out[i] = current;
+                continue;
+            }
+
+            if (note === current) {
+                candidate = null;
+                candidateRun = 0;
+                out[i] = current;
+                continue;
+            }
+
+            if (note === candidate) candidateRun++;
+            else { candidate = note; candidateRun = 1; }
+
+            if (candidateRun >= holdHops) {
+                current = candidate;
+                candidate = null;
+                candidateRun = 0;
+            }
+            out[i] = current;
+        }
+        return out;
+    }
     async function analyzeRecordedPitch(blob) {
         const ctx = getAudioCtx();
         const audioBuffer = await ctx.decodeAudioData(await blob.arrayBuffer());
         const data = audioBuffer.getChannelData(0);
         const sampleRate = audioBuffer.sampleRate;
-        const frame = 4096;
-        const hop = 1024;
+
+        // Smaller frame/hop than before: fast passages need finer time
+        // resolution both to catch short notes and to place their
+        // boundaries accurately. 2048 samples still covers several
+        // cycles of the lowest supported note.
+        const frame = 2048;
+        const hop = 256; // ~5.8ms at 44.1kHz — enough to resolve fast runs
+        const hopDur = hop / sampleRate;
+        const { minLag, maxLag } = getPitchSearchRange(sampleRate);
+
         const raw = [];
         for (let start = 0; start + frame <= data.length; start += hop) {
-            const note = detectPitchAutocorrelation(data, sampleRate, start, frame);
-            raw.push({ note, start: start / sampleRate, end: (start + hop) / sampleRate });
+            const pitch = detectPitchYIN(data, sampleRate, start, frame, minLag, maxLag);
+            raw.push({
+                t: start / sampleRate,
+                freq: pitch ? pitch.freq : null,
+                rms: windowRms(data, start, hop)
+            });
         }
+        if (!raw.length) return [];
+
+        // ~17ms hold (3 hops) — long enough to absorb boundary dither on a
+        // sustained note, short enough to still catch genuinely fast notes.
+        const notes = quantizeNotesWithHysteresis(raw.map(r => r.freq), 3);
+        const onsets = detectOnsets(raw, hopDur);
+
         const segments = [];
-        for (const item of raw) {
-            if (!item.note) continue;
+        for (let i = 0; i < raw.length; i++) {
+            const note = notes[i];
+            if (!note) continue;
             const last = segments[segments.length - 1];
-            if (last && last.note === item.note && item.start - last.end < 0.12) last.end = item.end;
-            else segments.push({ note: item.note, start: item.start, end: item.end });
+            const sameNote = last && last.note === note;
+            const bridgeableGap = last && (raw[i].t - last.end) < 0.06;
+            if (sameNote && bridgeableGap && !onsets.has(i)) {
+                last.end = raw[i].t + hopDur;
+            } else {
+                segments.push({ note, start: raw[i].t, end: raw[i].t + hopDur });
+            }
         }
-        // Ignore very short pitch glitches and merge tiny gaps.
-        return segments.filter(s => s.end - s.start >= 0.10).map(s => ({ note: s.note, duration: Math.max(0.1, s.end - s.start) }));
+
+        // Ignore very short pitch glitches, but keep the bar low enough
+        // for genuinely fast notes (down to ~45ms, i.e. 32nd notes around
+        // 165 BPM), unlike the previous fixed 100ms cutoff.
+        let kept = segments.filter(s => s.end - s.start >= 0.045);
+
+        // Suppress short pitch islands that occur inside an otherwise steady
+        // note. YIN can briefly jump to a neighbouring pitch even when the
+        // instrument is played at a constant level; such an island must not
+        // become a separate musical note. Genuine fast notes remain possible
+        // because this only removes an island when both neighbours agree.
+        const cleaned = [];
+        for (let i = 0; i < kept.length; i++) {
+            const cur = kept[i];
+            const prev = cleaned[cleaned.length - 1];
+            const next = kept[i + 1];
+            if (prev && next && prev.note === next.note && cur.note !== prev.note &&
+                (cur.end - cur.start) < 0.075) {
+                prev.end = next.end;
+                i++;
+                continue;
+            }
+            cleaned.push(cur);
+        }
+        kept = cleaned;
+
+        // The silence between one kept note and the next is a real pause in
+        // the melody and gets stored alongside the note that follows it.
+        // The gap before the very first note is NOT part of the melody —
+        // it's just the performer's preparation time before playing — so
+        // it's always forced to 0, regardless of how long the recording
+        // waited before the first sound.
+        return kept.map((s, i) => ({
+            note: s.note,
+            duration: Math.max(0.05, s.end - s.start),
+            restBefore: i === 0 ? 0 : Math.max(0, s.start - kept[i - 1].end)
+        }));
     }
 
     async function finishLineRecording(lineIdx, chunks, mimeType) {
@@ -2216,9 +2504,21 @@
                 id: `n-${Date.now()}-${i}`,
                 note: n.note,
                 duration: n.duration,
+                restBefore: i === 0 ? 0 : Math.max(0, Number(n.restBefore) || 0),
                 groupIdxs: []
             }));
-            // Do not generate or modify lyric text here. The existing text remains intact.
+            // The melody is now fully represented by detectedNotes: note order,
+            // pitch and duration. The original recording is kept separately as
+            // audioData, but player playback never depends on the recorded blob.
+            line.groups.forEach(g => {
+                delete g._detectedNoteIds;
+                delete g._detectedNoteId;
+                g.note = null;
+            });
+            if (status) {
+                status.textContent = `Готово: ${line.detectedNotes.length} нот`;
+                status.classList.remove('processing', 'recording');
+            }
             renderAll();
         } catch (e) {
             console.error('Audio analysis error:', e);
@@ -2319,26 +2619,21 @@
         const detected = (line.detectedNotes || []).find(n => n.id === noteId);
         const target = line.groups[groupIdx];
         if (!detected || !target) return;
-        const links = normalizeDetectedNoteLinks(line, detected);
 
-        // The same detected note may be assigned to many groups. If this group
-        // already uses another detected note, that note is replaced only here.
-        const existingIds = groupDetectedIds(target);
-        existingIds.forEach(oldId => {
-            if (oldId === noteId) return;
-            const previous = line.detectedNotes.find(n => n.id === oldId);
-            if (previous) {
-                normalizeDetectedNoteLinks(line, previous);
-                previous.groupIdxs = previous.groupIdxs.filter(i => i !== groupIdx);
-            }
-        });
+        const ids = groupDetectedIds(target).filter((id, index, arr) => arr.indexOf(id) === index);
+        if (!ids.includes(noteId)) ids.push(noteId);
 
-        target._detectedNoteIds = [noteId];
+        target._detectedNoteIds = ids;
         delete target._detectedNoteId;
+
+        normalizeDetectedNoteLinks(line, detected);
+        if (!detected.groupIdxs.includes(groupIdx)) detected.groupIdxs.push(groupIdx);
+
+        // Keep the legacy single-note field synchronized for older UI/state,
+        // but playback is driven exclusively by line.detectedNotes.
         target.note = detected.note;
         target.duration = detected.duration;
-        if (!links.includes(groupIdx)) links.push(groupIdx);
-        detected.groupIdxs = links;
+
         playNoteOnce(detected.note);
         renderAll();
     }
@@ -2367,6 +2662,93 @@
         renderAll();
     }
 
+    function setupGroupReverseDrag(lineIdx, chip, visual) {
+        let drag = null;
+        let suppressClick = false;
+        const clearTargets = () => visual.querySelectorAll('.reverse-drop-target').forEach(el => el.classList.remove('reverse-drop-target'));
+
+        const cleanup = () => {
+            clearTargets();
+            if (drag?.ghost) drag.ghost.remove();
+            chip.classList.remove('drag-source');
+            try { if (drag?.pointerId != null) chip.releasePointerCapture(drag.pointerId); } catch (_) {}
+            drag = null;
+        };
+
+        const onMove = e => {
+            if (!drag) return;
+            const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
+            if (!drag.moved && Math.hypot(dx, dy) < 6) return;
+            drag.moved = true;
+            e.preventDefault();
+            drag.ghost.style.left = `${e.clientX - drag.offsetX}px`;
+            drag.ghost.style.top = `${e.clientY - drag.offsetY}px`;
+            clearTargets();
+            const under = document.elementFromPoint(e.clientX, e.clientY);
+            const noteEl = under?.closest?.('.detected-note');
+            if (!noteEl || noteEl.closest('.line-block')?.dataset.line !== String(lineIdx)) return;
+            const groupIdx = parseInt(chip.dataset.group, 10);
+            const noteId = noteEl.dataset.noteId;
+            const group = state.lines[lineIdx]?.groups?.[groupIdx];
+            if (group && groupDetectedIds(group).includes(noteId)) noteEl.classList.add('reverse-drop-target');
+        };
+
+        const finish = e => {
+            if (!drag) return;
+            const wasMoved = drag.moved;
+            const under = document.elementFromPoint(e.clientX, e.clientY);
+            const noteEl = under?.closest?.('.detected-note');
+            const groupIdx = parseInt(chip.dataset.group, 10);
+            const line = state.lines[lineIdx];
+            const group = line?.groups?.[groupIdx];
+            const validTarget = wasMoved && noteEl &&
+                noteEl.closest('.line-block')?.dataset.line === String(lineIdx) &&
+                group && groupDetectedIds(group).includes(noteEl.dataset.noteId);
+
+            cleanup();
+            if (wasMoved) suppressClick = true;
+            if (validTarget) detachDetectedNote(lineIdx, noteEl.dataset.noteId, groupIdx);
+            setTimeout(() => { suppressClick = false; }, 0);
+        };
+
+        chip.addEventListener('pointerdown', e => {
+            if (e.button !== undefined && e.button !== 0) return;
+            if (e.target.closest('.action-btn, .note-badge')) return;
+            const line = state.lines[lineIdx];
+            const groupIdx = parseInt(chip.dataset.group, 10);
+            const group = line?.groups?.[groupIdx];
+            if (!group || !groupDetectedIds(group).length) return;
+
+            const r = chip.getBoundingClientRect();
+            const ghost = chip.cloneNode(true);
+            ghost.classList.add('group-drag-ghost');
+            Object.assign(ghost.style, {
+                position:'fixed', left:`${r.left}px`, top:`${r.top}px`, width:`${r.width}px`,
+                margin:'0', pointerEvents:'none', zIndex:'9999'
+            });
+            document.body.appendChild(ghost);
+            chip.classList.add('drag-source');
+            e.preventDefault();
+            e.stopPropagation();
+            try { chip.setPointerCapture(e.pointerId); } catch (_) {}
+            drag = {
+                startX:e.clientX, startY:e.clientY,
+                offsetX:e.clientX-r.left, offsetY:e.clientY-r.top,
+                moved:false, ghost, pointerId:e.pointerId
+            };
+        });
+
+        chip.addEventListener('pointermove', onMove);
+        chip.addEventListener('pointerup', finish);
+        chip.addEventListener('pointercancel', finish);
+        chip.addEventListener('click', e => {
+            if (suppressClick) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        }, true);
+    }
+
     function renderDetectedNoteConnections(lineIdx, visual) {
         const line = state.lines[lineIdx];
         if (!line || line.notesCollapsed) return;
@@ -2375,30 +2757,64 @@
         const box = visual.getBoundingClientRect();
         svg.setAttribute('viewBox', `0 0 ${Math.max(1, box.width)} ${Math.max(1, box.height)}`);
         svg.innerHTML = '';
+
+        const links = [];
         (line.detectedNotes || []).forEach(n => {
             const noteEl = visual.querySelector(`.detected-note[data-note-id="${CSS.escape(n.id)}"]`);
             if (!noteEl) return;
-            const links = Array.isArray(n.groupIdxs) ? n.groupIdxs : (n.groupIdx != null ? [n.groupIdx] : []);
-            links.forEach(groupIdx => {
+            const groupIdxs = Array.isArray(n.groupIdxs) ? n.groupIdxs : (n.groupIdx != null ? [n.groupIdx] : []);
+            groupIdxs.forEach(groupIdx => {
                 const chip = visual.querySelector(`.chip[data-group="${groupIdx}"]`);
                 if (!chip) return;
                 const a = noteEl.getBoundingClientRect();
                 const b = chip.getBoundingClientRect();
-                const x1 = a.left + a.width / 2 - box.left;
-                const y1 = a.bottom - box.top;
-                const x2 = b.left + b.width / 2 - box.left;
-                const y2 = b.top - box.top;
-                const lineEl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                lineEl.setAttribute('x1', x1);
-                lineEl.setAttribute('y1', y1);
-                lineEl.setAttribute('x2', x2);
-                lineEl.setAttribute('y2', y2);
-                lineEl.setAttribute('stroke', 'currentColor');
-                lineEl.setAttribute('stroke-width', '0.03125mm');
-                lineEl.setAttribute('stroke-linecap', 'round');
-                lineEl.setAttribute('opacity', '0.6');
-                svg.appendChild(lineEl);
+                links.push({
+                    noteId: n.id, groupIdx,
+                    x1: a.left + a.width / 2 - box.left,
+                    y1: a.bottom - box.top,
+                    x2: b.left + b.width / 2 - box.left,
+                    y2: b.top - box.top
+                });
             });
+        });
+
+        // Give coincident connections a small, deterministic horizontal offset.
+        // The offset is applied independently to links sharing the same note
+        // or the same group, which prevents many-to-many connections from
+        // visually collapsing into one line while leaving a single connection
+        // exactly where it was.
+        const assignOffsets = (items, keyFn) => {
+            const buckets = new Map();
+            items.forEach(item => {
+                const key = keyFn(item);
+                if (!buckets.has(key)) buckets.set(key, []);
+                buckets.get(key).push(item);
+            });
+            buckets.forEach(bucket => {
+                if (bucket.length < 2) return;
+                const step = 7;
+                const center = (bucket.length - 1) / 2;
+                bucket.forEach((item, index) => {
+                    const offset = (index - center) * step;
+                    item.x1 += offset;
+                    item.x2 += offset;
+                });
+            });
+        };
+        assignOffsets(links, item => `note:${item.noteId}`);
+        assignOffsets(links, item => `group:${item.groupIdx}`);
+
+        links.forEach(({x1, y1, x2, y2}) => {
+            const lineEl = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            lineEl.setAttribute('x1', x1);
+            lineEl.setAttribute('y1', y1);
+            lineEl.setAttribute('x2', x2);
+            lineEl.setAttribute('y2', y2);
+            lineEl.setAttribute('stroke', 'currentColor');
+            lineEl.setAttribute('stroke-width', '0.3mm');
+            lineEl.setAttribute('stroke-linecap', 'round');
+            lineEl.setAttribute('opacity', '0.6');
+            svg.appendChild(lineEl);
         });
     }
 
@@ -2437,21 +2853,34 @@
         };
         const finish = e => {
             if (!drag) return;
-            const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
-            const distance = Math.hypot(dx, dy);
-            const elapsed = performance.now() - drag.startedAt;
-            const isIntentionalSwipe = distance >= 100 && elapsed <= 650;
             const under = document.elementFromPoint(e.clientX, e.clientY);
             const chip = under?.closest?.('.chip');
             clearTargets();
             drag.ghost.remove();
             noteEl.classList.remove('drag-source');
             noteEl.releasePointerCapture?.(e.pointerId);
-            if (drag.moved && chip && chip.closest('.line-block')?.dataset.line === String(lineIdx)) {
+            const droppedInsideSameLine = chip && chip.closest('.line-block')?.dataset.line === String(lineIdx);
+
+            // A note is deleted only when it is deliberately carried outside its
+            // own line block ("групи слів з нотами"). Dropping it anywhere else
+            // inside that block — including empty space between chips — must
+            // just return it to its original place, unchanged. This works the
+            // same way for mouse, touch and pen via Pointer Events.
+            const lineBlockEl = visual.closest('.line-block');
+            const blockRect = lineBlockEl ? lineBlockEl.getBoundingClientRect() : null;
+            const droppedOutsideBlock = !!blockRect && (
+                e.clientX < blockRect.left || e.clientX > blockRect.right ||
+                e.clientY < blockRect.top || e.clientY > blockRect.bottom
+            );
+
+            if (drag.moved && droppedInsideSameLine) {
                 attachDetectedNote(lineIdx, noteEl.dataset.noteId, parseInt(chip.dataset.group));
-            } else if (isIntentionalSwipe) {
+            } else if (drag.moved && droppedOutsideBlock) {
                 removeDetectedNote(noteEl.dataset.noteId);
             }
+            // Otherwise (moved but dropped inside the block, off any chip, or
+            // not moved at all): do nothing — the note snaps back on its own
+            // since it was never removed from the DOM/model, order intact.
             drag = null;
         };
         noteEl.addEventListener('pointerdown', e => {
@@ -2470,11 +2899,10 @@
             document.body.appendChild(ghost);
             noteEl.classList.add('drag-source');
             drag = { startX:e.clientX, startY:e.clientY, offsetX:e.clientX-r.left, offsetY:e.clientY-r.top, moved:false, startedAt:performance.now(), ghost };
-            noteEl.setPointerCapture?.(e.pointerId);
         });
-        noteEl.addEventListener('pointermove', onMove);
-        noteEl.addEventListener('pointerup', finish);
-        noteEl.addEventListener('pointercancel', finish);
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', finish);
+        document.addEventListener('pointercancel', finish);
         noteEl.addEventListener('dblclick', e => { e.preventDefault(); e.stopPropagation(); openDetectedNotePopup(lineIdx, noteEl.dataset.noteId); });
     }
 
@@ -2490,15 +2918,16 @@
 
         const mergedWords = [...current.words, ...next.words];
         const note = current.note !== null ? current.note : next.note;
+        const mergedNoteIds = [...new Set([...groupDetectedIds(current), ...groupDetectedIds(next)])];
 
         groups.splice(groupIdx, 2, {
             words: mergedWords,
             note: note,
-            duration: (current.duration || 0.6) + (next.duration || 0.6)
+            duration: (current.duration || 0.6) + (next.duration || 0.6),
+            _detectedNoteIds: mergedNoteIds
         });
 
-        (line.detectedNotes || []).forEach(n => { n.groupIdxs = []; delete n.groupIdx; });
-        line.groups.forEach(g => { delete g._detectedNoteIds; delete g._detectedNoteId; });
+        syncDetectedNoteLinks(line);
         updateTextareaFromState();
         renderAll();
     }
@@ -2514,19 +2943,21 @@
         const lastWord = words[words.length - 1];
         const restWords = words.slice(0, words.length - 1);
         const note = group.note;
+        const noteIds = groupDetectedIds(group);
 
         line.groups.splice(groupIdx, 1, {
             words: restWords,
             note: note,
-            duration: group.duration || 0.6
+            duration: group.duration || 0.6,
+            _detectedNoteIds: [...noteIds]
         }, {
             words: [lastWord],
             note: null,
-            duration: 0.6
+            duration: 0.6,
+            _detectedNoteIds: []
         });
 
-        (line.detectedNotes || []).forEach(n => { n.groupIdxs = []; delete n.groupIdx; });
-        line.groups.forEach(g => { delete g._detectedNoteIds; delete g._detectedNoteId; });
+        syncDetectedNoteLinks(line);
         updateTextareaFromState();
         renderAll();
     }
@@ -2565,6 +2996,14 @@
     }
 
     function renderGroups() {
+        // A drag ghost is appended straight to document.body so it can float
+        // freely over everything. If a drag gets interrupted by a re-render
+        // (e.g. another line's recording finishes, or notes are cleared,
+        // while a note is mid-drag) its pointerup/pointercancel may never
+        // reach the now-replaced note element, leaving the ghost stuck.
+        // Rebuilding the groups DOM is a safe point to always clear it out.
+        document.querySelectorAll('.detected-note-drag-ghost, .group-drag-ghost').forEach(el => el.remove());
+
         const container = groupsContainer;
         if (!state.lines.length || state.lines.every(l => l.isEmpty && !l.draft)) {
             container.innerHTML = `<div class="empty-state"><span class="big-icon">📝</span>Вставте текст в поле для тексту пісні, щоб створити групи слів</div>`;
@@ -2601,7 +3040,7 @@
             html += `<input type="text" class="line-text-input" data-line="${li}" placeholder="Текст рядка">`;
             const notes = line.detectedNotes || [];
             html += `<div class="record-actions">`;
-            html += `<button class="btn btn-secondary btn-sm record-line-btn" data-line="${li}" type="button">🎙 Додати аудіо</button>`;
+            html += `<button class="record-line-btn" data-line="${li}" type="button">🎙 Додати аудіо</button>`;
             html += `<button class="clear-line-notes-btn" data-clear-line-notes="${li}" type="button">🗑 Видалити всі ноти</button>`;
             html += `<button class="line-notes-toggle" data-toggle-notes="${li}" type="button">♫ Ноти${notes.length ? ` (${notes.length})` : ''} ${line.notesCollapsed ? '▸' : '▾'}</button>`;
             if (line.audioData) html += `<span class="line-audio-badge">● Аудіо проаналізовано</span>`;
@@ -2613,7 +3052,7 @@
             html += `<div class="line-notes-strip">`;
             if (notes.length) {
                 notes.forEach(n => {
-                    html += `<div class="detected-note" data-note-id="${escapeHtml(n.id)}" title="${escapeHtml(n.note)} — ${n.duration.toFixed(2)} с">${escapeHtml(n.note.replace(/\d/, ''))}<span class="detected-note-duration">${n.duration.toFixed(2)}s</span></div>`;
+                    html += `<div class="detected-note" data-note-id="${escapeHtml(n.id)}" title="${escapeHtml(n.note)} — ${n.duration.toFixed(2)} с">${escapeHtml(n.note.replace(/\d/, ''))}</div>`;
                 });
             } else {
                 html += `<div class="line-notes-empty">Після запису тут з’являться визначені ноти</div>`;
@@ -2706,6 +3145,12 @@
             });
         });
 
+        container.querySelectorAll('.chip').forEach(chip => {
+            const li = parseInt(chip.dataset.line, 10);
+            const visual = chip.closest('.line-notes-visual');
+            if (visual) setupGroupReverseDrag(li, chip, visual);
+        });
+
         container.querySelectorAll('[data-action="merge"]').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -2751,194 +3196,448 @@
     // ============================================================
     // 8.5 LINE PLAYER
     // ============================================================
-    function lineDuration(lineIdx) {
+    // The player has ONE source of truth: line.detectedNotes.
+    // Word groups only provide the visual lyrics that are linked to each note.
+    function getLineMelody(lineIdx) {
         const line = state.lines[lineIdx];
-        return line ? line.groups.reduce((s,g) => s + (g.duration || 0.6), 0) : 0;
+        if (!line || !Array.isArray(line.detectedNotes)) return [];
+        return line.detectedNotes
+            .filter(n => n && n.note && Number.isFinite(Number(n.duration)) && Number(n.duration) > 0)
+            .map((n, i) => ({
+                id: n.id,
+                note: n.note,
+                duration: Math.max(0.05, Number(n.duration)),
+                // Silence before this note, as detected during recording (or
+                // set manually). The pause before the very first note is
+                // never played back — see analyzeRecordedPitch — so it's
+                // forced to 0 here too, defensively.
+                restBefore: i === 0 ? 0 : Math.max(0, Number(n.restBefore) || 0),
+                groupIdxs: Array.isArray(n.groupIdxs) ? n.groupIdxs : []
+            }));
     }
+
+    // Cumulative timeline for a melody: for each note, where its preceding
+    // pause starts, where the note itself starts (after the pause), and
+    // where it ends. Used everywhere playback needs to reason about time.
+    function melodySlotBounds(melody) {
+        let pos = 0;
+        return melody.map(n => {
+            const restStart = pos;
+            const noteStart = pos + n.restBefore;
+            const noteEnd = noteStart + n.duration;
+            pos = noteEnd;
+            return { restStart, noteStart, noteEnd };
+        });
+    }
+
+    function lineDuration(lineIdx) {
+        return getLineMelody(lineIdx).reduce((sum, n) => sum + n.restBefore + n.duration, 0);
+    }
+
     function stopLinePlayback(collapse = true) {
         const pp = state.playerPlayback;
         if (pp.timer) clearTimeout(pp.timer);
         if (pp.raf) cancelAnimationFrame(pp.raf);
-        pp.timer = null; pp.raf = null;
+        pp.timer = null;
+        pp.raf = null;
         stopAllContinuous();
-        if (collapse && pp.expanded !== null) pp.expanded = null;
-        pp.playing = false; pp.lineIdx = null; pp.elapsed = 0;
+        if (collapse) pp.expanded = null;
+        pp.playing = false;
+        pp.lineIdx = null;
+        pp.elapsed = 0;
         document.querySelectorAll('.player-chip.playing-group').forEach(el => el.classList.remove('playing-group'));
         document.querySelectorAll('.player-line.playing-line').forEach(el => el.classList.remove('playing-line'));
     }
+
+    function findActiveMelodyNote(lineIdx, elapsed) {
+        const melody = getLineMelody(lineIdx);
+        const bounds = melodySlotBounds(melody);
+        for (let i = 0; i < melody.length; i++) {
+            // During a note's preceding pause, nothing is "active" — no
+            // sound plays and no group should stay highlighted.
+            if (elapsed >= bounds[i].noteStart && elapsed < bounds[i].noteEnd) return melody[i];
+        }
+        return null;
+    }
+
     function setPlayerProgress(lineIdx, elapsed) {
-        const line = state.lines[lineIdx]; if (!line) return;
+        const line = state.lines[lineIdx];
+        if (!line) return;
+
         const total = lineDuration(lineIdx);
-        const clamped = Math.max(0, Math.min(total, elapsed));
-        state.playerPlayback.elapsed = clamped;
+        const clamped = Math.max(0, Math.min(total, Number(elapsed) || 0));
+        // NOTE: intentionally NOT writing `clamped` back into
+        // state.playerPlayback.elapsed here. This function is also called every
+        // animation frame with a wall-clock-interpolated value; persisting that
+        // into the baseline (without also resetting startedAt) made the next
+        // frame add the same time-since-start on top of an already-advanced
+        // baseline, compounding every frame and racing past the melody's total
+        // duration almost instantly. Every caller that needs to move the real
+        // baseline (playLineFrom, note transitions, seeks) already sets
+        // state.playerPlayback.elapsed itself before calling this function.
+
         const root = playerContainer.querySelector(`.player-line[data-line="${lineIdx}"]`);
         if (!root) return;
-        const pct = total ? clamped / total * 100 : 0;
+
+        const pct = total > 0 ? (clamped / total) * 100 : 0;
         const progress = root.querySelector('.player-track-progress');
         const dot = root.querySelector('.player-track-dot');
         const current = root.querySelector('.player-current-time');
-        if (progress) progress.style.width = pct + '%';
-        if (dot) dot.style.left = pct + '%';
+        if (progress) progress.style.width = `${pct}%`;
+        if (dot) dot.style.left = `${pct}%`;
         if (current) current.textContent = formatTime(clamped);
-        let pos = 0;
-        root.querySelectorAll('.player-chip').forEach((chip, gi) => {
-            const d = line.groups[gi].duration || 0.6;
-            const active = clamped >= pos && clamped < pos + d && clamped < total;
-            chip.classList.toggle('playing-group', active);
-            pos += d;
+
+        // A detected note can be linked to several word groups.
+        // Every linked group is highlighted while that note is sounding.
+        const activeNote = findActiveMelodyNote(lineIdx, clamped);
+        const activeId = activeNote?.id || null;
+        root.querySelectorAll('.player-chip').forEach(chip => {
+            const groupIdx = parseInt(chip.dataset.group, 10);
+            const group = line.groups[groupIdx];
+            const linked = group && groupDetectedIds(group).includes(activeId);
+            chip.classList.toggle('playing-group', !!linked);
         });
     }
-    function formatTime(sec) { sec = Math.max(0, sec || 0); return `${Math.floor(sec/60)}:${String(Math.floor(sec%60)).padStart(2,'0')}`; }
-    function playLineFrom(lineIdx, startAt = 0) {
-        const line = state.lines[lineIdx]; if (!line || !line.groups.length) return;
+
+    function formatTime(sec) {
+        sec = Math.max(0, Number(sec) || 0);
+        return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`;
+    }
+
+    async function playLineFrom(lineIdx, startAt = 0) {
+        const line = state.lines[lineIdx];
+        const melody = getLineMelody(lineIdx);
+        if (!line || !melody.length) return false;
+
+        // The first call is made directly from the user's click, so explicitly
+        // resume Web Audio here. No recorded audio blob is used for playback.
+        const ctx = getAudioCtx();
+        if (ctx.state === 'suspended') {
+            try { await ctx.resume(); } catch (e) { console.warn('AudioContext resume failed:', e); }
+        }
+
         stopLinePlayback(false);
+
         state.playerPlayback.lineIdx = lineIdx;
         state.playerPlayback.expanded = lineIdx;
         state.playerPlayback.playing = true;
-        state.playerPlayback.elapsed = Math.min(startAt, lineDuration(lineIdx));
+
+        const bounds = melodySlotBounds(melody);
+        const total = bounds.length ? bounds[bounds.length - 1].noteEnd : 0;
+        const at = Math.max(0, Math.min(Number(startAt) || 0, total));
+        state.playerPlayback.elapsed = at;
         state.playerPlayback.startedAt = performance.now();
-        const speed = state.playerPlayback.speed || 1;
-        let elapsed = state.playerPlayback.elapsed;
-        let pos = 0;
-        for (const g of line.groups) {
-            const d = g.duration || 0.6;
-            if (elapsed >= pos + d) { pos += d; continue; }
-            const remaining = pos + d - elapsed;
-            if (g.note) playNote(g.note, Math.max(0.08, remaining / speed));
-            const delay = remaining * 1000 / speed;
-            state.playerPlayback.timer = setTimeout(() => playNextGroup(lineIdx, line.groups.indexOf(g) + 1), delay);
-            break;
+
+        const speed = Number(state.playerPlayback.speed) || 1;
+
+        // Find the note whose slot (pause + note) contains the requested
+        // start position.
+        let noteIndex = bounds.findIndex(b => at < b.noteEnd);
+        if (noteIndex === -1) noteIndex = melody.length;
+
+        if (noteIndex < melody.length) {
+            const { noteStart, noteEnd } = bounds[noteIndex];
+            if (at < noteStart) {
+                // The requested position falls inside the pause before this
+                // note — wait out the remaining silence, then play the note
+                // in full (no sound, no highlight, until the pause ends).
+                const restRemaining = noteStart - at;
+                state.playerPlayback.timer = setTimeout(
+                    () => playMelodyNoteAfterRest(lineIdx, noteIndex),
+                    restRemaining * 1000 / speed
+                );
+            } else {
+                const remaining = Math.max(0.05, noteEnd - at);
+                playNote(melody[noteIndex].note, remaining / speed);
+                state.playerPlayback.timer = setTimeout(
+                    () => playNextMelodyNote(lineIdx, noteIndex + 1),
+                    remaining * 1000 / speed
+                );
+            }
+        } else {
+            state.playerPlayback.playing = false;
+            state.playerPlayback.elapsed = total;
         }
+
         renderPlayer();
-        requestAnimationFrame(playerAnimationFrame);
+        setPlayerProgress(lineIdx, at);
+        state.playerPlayback.raf = requestAnimationFrame(playerAnimationFrame);
+        return true;
     }
-    function playNextGroup(lineIdx, groupIdx) {
-        if (!state.playerPlayback.playing || state.playerPlayback.lineIdx !== lineIdx) return;
-        const line = state.lines[lineIdx];
-        if (!line || groupIdx >= line.groups.length) { stopLinePlayback(false); setPlayerProgress(lineIdx, lineDuration(lineIdx)); renderPlayer(); return; }
-        const before = line.groups.slice(0, groupIdx).reduce((s,g)=>s+(g.duration||0.6),0);
-        state.playerPlayback.elapsed = before;
-        state.playerPlayback.startedAt = performance.now();
-        const g = line.groups[groupIdx];
-        const d = g.duration || 0.6;
-        if (g.note) playNote(g.note, d / (state.playerPlayback.speed || 1));
-        state.playerPlayback.timer = setTimeout(() => playNextGroup(lineIdx, groupIdx + 1), d * 1000 / (state.playerPlayback.speed || 1));
+
+    // Plays a melody note in full, assuming its preceding pause (if any)
+    // has already fully elapsed (either because it was 0 or because a
+    // setTimeout already waited it out).
+    function playMelodyNoteAfterRest(lineIdx, noteIndex) {
+        const pp = state.playerPlayback;
+        if (!pp.playing || pp.lineIdx !== lineIdx) return;
+
+        const melody = getLineMelody(lineIdx);
+        const bounds = melodySlotBounds(melody);
+        const b = bounds[noteIndex];
+        if (!b) return;
+
+        pp.elapsed = b.noteStart;
+        pp.startedAt = performance.now();
+
+        const note = melody[noteIndex];
+        const speed = Number(pp.speed) || 1;
+        playNote(note.note, note.duration / speed);
+        pp.timer = setTimeout(
+            () => playNextMelodyNote(lineIdx, noteIndex + 1),
+            note.duration * 1000 / speed
+        );
     }
+
+    function playNextMelodyNote(lineIdx, noteIdx) {
+        const pp = state.playerPlayback;
+        if (!pp.playing || pp.lineIdx !== lineIdx) return;
+
+        const melody = getLineMelody(lineIdx);
+        if (noteIdx >= melody.length) {
+            const total = lineDuration(lineIdx);
+            pp.playing = false;
+            pp.timer = null;
+            pp.elapsed = total;
+            setPlayerProgress(lineIdx, total);
+            renderPlayer();
+            return;
+        }
+
+        const bounds = melodySlotBounds(melody);
+        const { restStart } = bounds[noteIdx];
+        const restBefore = melody[noteIdx].restBefore;
+        const speed = Number(pp.speed) || 1;
+
+        // Mark the start of this note's pause right away, so the progress
+        // bar and elapsed-time readout keep advancing smoothly through the
+        // silence (playerAnimationFrame interpolates from here).
+        pp.elapsed = restStart;
+        pp.startedAt = performance.now();
+
+        if (restBefore > 0) {
+            pp.timer = setTimeout(() => playMelodyNoteAfterRest(lineIdx, noteIdx), restBefore * 1000 / speed);
+        } else {
+            playMelodyNoteAfterRest(lineIdx, noteIdx);
+        }
+    }
+
     function playerAnimationFrame() {
         const pp = state.playerPlayback;
         if (!pp.playing || pp.lineIdx === null) return;
-        const elapsed = pp.elapsed + (performance.now() - pp.startedAt) / 1000 * (pp.speed || 1);
+
+        const elapsed = pp.elapsed + (performance.now() - pp.startedAt) / 1000 * (Number(pp.speed) || 1);
+        const total = lineDuration(pp.lineIdx);
         setPlayerProgress(pp.lineIdx, elapsed);
-        if (elapsed >= lineDuration(pp.lineIdx)) {
+
+        if (elapsed >= total) {
             const finishedLine = pp.lineIdx;
             if (pp.timer) clearTimeout(pp.timer);
             pp.timer = null;
             pp.playing = false;
-            pp.elapsed = lineDuration(finishedLine);
-            pp.lineIdx = finishedLine;
-            setPlayerProgress(finishedLine, pp.elapsed);
+            pp.elapsed = total;
+            setPlayerProgress(finishedLine, total);
             renderPlayer();
             return;
         }
         pp.raf = requestAnimationFrame(playerAnimationFrame);
     }
+
     function togglePlayerLine(lineIdx) {
-        if (state.playerPlayback.expanded === lineIdx) { stopLinePlayback(true); renderPlayer(); return; }
+        const melody = getLineMelody(lineIdx);
+        if (!melody.length) return;
+
+        const pp = state.playerPlayback;
+        if (pp.playing && pp.lineIdx === lineIdx) {
+            stopLinePlayback(true);
+            renderPlayer();
+            return;
+        }
+
         stopLinePlayback(true);
-        state.playerPlayback.speed = 1;
+        pp.speed = 1;
         playLineFrom(lineIdx, 0);
     }
+
     function seekLinePlayer(lineIdx, ratio) {
-        const total = lineDuration(lineIdx); const at = Math.max(0, Math.min(1, ratio)) * total;
-        if (state.playerPlayback.lineIdx === lineIdx && state.playerPlayback.playing) playLineFrom(lineIdx, at);
-        else { state.playerPlayback.lineIdx = lineIdx; state.playerPlayback.expanded = lineIdx; state.playerPlayback.elapsed = at; renderPlayer(); setPlayerProgress(lineIdx, at); }
+        const total = lineDuration(lineIdx);
+        if (!total) return;
+        const at = Math.max(0, Math.min(1, Number(ratio) || 0)) * total;
+
+        if (state.playerPlayback.lineIdx === lineIdx && state.playerPlayback.playing) {
+            playLineFrom(lineIdx, at);
+        } else {
+            stopLinePlayback(false);
+            state.playerPlayback.lineIdx = lineIdx;
+            state.playerPlayback.expanded = lineIdx;
+            state.playerPlayback.elapsed = at;
+            renderPlayer();
+            setPlayerProgress(lineIdx, at);
+        }
     }
+
     function switchPlayerLine(delta) {
-        const current = state.playerPlayback.expanded ?? 0;
-        const candidates = state.lines.map((l,i)=>({l,i})).filter(x=>!x.l.isEmpty && x.l.groups.length);
-        const idx = candidates.findIndex(x=>x.i === current);
-        const next = candidates[Math.max(0, Math.min(candidates.length-1, idx + delta))];
+        const current = state.playerPlayback.expanded;
+        const candidates = state.lines
+            .map((line, i) => ({ line, i }))
+            .filter(x => getLineMelody(x.i).length > 0);
+        if (!candidates.length) return;
+
+        const currentIndex = candidates.findIndex(x => x.i === current);
+        const base = currentIndex >= 0 ? currentIndex : (delta > 0 ? -1 : candidates.length);
+        const nextIndex = Math.max(0, Math.min(candidates.length - 1, base + delta));
+        const next = candidates[nextIndex];
         if (!next) return;
-        const targetEl = playerContainer.querySelector(`.player-line[data-line="${next.i}"]`);
-        targetEl?.scrollIntoView({ behavior:'smooth', block:'center' });
+
+        playerContainer.querySelector(`.player-line[data-line="${next.i}"]`)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         playLineFrom(next.i, 0);
     }
 
     function renderPlayer() {
         const container = playerContainer;
-        if (!state.lines.length || state.lines.every(l => l.isEmpty || l.groups.length === 0)) {
-            container.innerHTML = `<div class="empty-state"><span class="big-icon">🎤</span>Немає груп для тренування. Спочатку створіть групи в редакторі.</div>`;
-            playerGroupCount.textContent = '0 груп';
+        const linesForPlayer = state.lines
+            .map((line, i) => ({ line, i, melody: getLineMelody(i) }))
+            .filter(x => !x.line.isEmpty && (x.line.rawText ?? '').trim().length || (!x.line.isEmpty && x.line.groups.length));
+
+        if (!linesForPlayer.length) {
+            container.innerHTML = `<div class="empty-state"><span class="big-icon">🎤</span>Немає рядків для тренування. Спочатку створіть рядки в редакторі.</div>`;
+            playerGroupCount.textContent = '0 нот';
             return;
         }
-        let totalGroups = 0;
+
         let html = '';
-        let displayLineNumber = 0;
-        for (let li = 0; li < state.lines.length; li++) {
-            const line = state.lines[li];
-            if (line.isEmpty) { html += `<div class="player-line empty-line"></div>`; continue; }
-            if (!line.groups.length) continue;
-            totalGroups += line.groups.length;
+        let totalNotes = 0;
+
+        for (const item of linesForPlayer) {
+            const li = item.i;
+            const line = item.line;
+            const melody = item.melody;
             const expanded = state.playerPlayback.expanded === li;
-            html += `<div class="player-line${state.playerPlayback.lineIdx===li && state.playerPlayback.playing?' playing-line':''}" data-line="${li}">`;
+            totalNotes += melody.length;
+
+            const displayNumber = state.lines
+                .slice(0, li + 1)
+                .filter(l => !l.isEmpty && ((l.rawText ?? '').trim().length || l.groups.length))
+                .length;
+
+            html += `<div class="player-line${state.playerPlayback.lineIdx === li && state.playerPlayback.playing ? ' playing-line' : ''}" data-line="${li}">`;
             html += `<div class="player-line-head">`;
-            html += `<button class="player-line-play${expanded?' expanded':''}" data-line-play="${li}" title="Програти рядок">▶</button>`;
-            html += `<span class="player-line-label">${state.lines.slice(0, li + 1).filter(l => !l.isEmpty && ((l.rawText ?? '').trim().length || l.groups.length)).length}</span>`;
+            const hasMelody = melody.length > 0;
+            const isPlaying = state.playerPlayback.playing && state.playerPlayback.lineIdx === li;
+            html += `<button type="button" class="player-line-play${expanded ? ' expanded' : ''}" data-line-play="${li}" ${hasMelody ? '' : 'disabled'} title="${hasMelody ? 'Програти мелодію рядка' : 'Для цього рядка ще немає записаної мелодії'}">${isPlaying ? '⏸' : '▶'}</button>`;
+            html += `<span class="player-line-label">Рядок ${displayNumber}</span>`;
+            if (!hasMelody) html += `<span class="line-audio-badge" style="opacity:.55">Немає записаної мелодії</span>`;
             html += `<div class="player-chips">`;
+
+            // Show the lyric groups and the note that is actually linked to them.
             for (let gi = 0; gi < line.groups.length; gi++) {
                 const group = line.groups[gi];
-                const note = group.note;
-                const displayText = group.words.join(' ');
-                const groupId = getGroupId(li, gi);
-                const hasNote = note !== null;
-                const noteDisplay = hasNote ? note.replace(/\d/, '') : '—';
-                html += `<div class="player-chip" data-group-id="${groupId}" data-line="${li}" data-group="${gi}" data-note="${note || ''}">${escapeHtml(displayText)}`;
-                if (hasNote) html += `<span class="note-label">${noteDisplay}</span>`;
+                const ids = groupDetectedIds(group);
+                const linked = melody.filter(n => ids.includes(n.id));
+                const note = linked.length ? linked[linked.length - 1].note : group.note;
+                const noteDisplay = note ? note.replace(/\d/, '') : '';
+                html += `<div class="player-chip" data-line="${li}" data-group="${gi}" data-note="${note || ''}">`;
+                html += `${escapeHtml(group.words.join(' '))}`;
+                if (noteDisplay) html += `<span class="note-label">${escapeHtml(noteDisplay)}</span>`;
                 html += `</div>`;
             }
             html += `</div></div>`;
+
             if (expanded) {
                 const total = lineDuration(li);
-                const elapsed = state.playerPlayback.lineIdx===li ? state.playerPlayback.elapsed : 0;
-                const pct = total ? elapsed/total*100 : 0;
+                const elapsed = state.playerPlayback.lineIdx === li ? state.playerPlayback.elapsed : 0;
+                const pct = total ? elapsed / total * 100 : 0;
                 html += `<div class="player-line-player" data-player="${li}">`;
                 html += `<div class="player-track" data-seek-line="${li}"><div class="player-track-progress" style="width:${pct}%"></div><div class="player-track-dot" style="left:${pct}%"></div></div>`;
                 html += `<div class="player-time"><span class="player-current-time">${formatTime(elapsed)}</span><span>${formatTime(total)}</span></div>`;
                 html += `<div class="player-tools">`;
-                html += `<button class="player-mini-btn" data-prev-line="${li}" title="Попередній рядок">⏮</button>`;
-                html += `<button class="player-mini-btn" data-restart-line="${li}" title="Спочатку">↺</button>`;
-                html += `<button class="player-mini-btn" data-next-line="${li}" title="Наступний рядок">⏭</button>`;
-                html += `<div class="player-speed">Швидкість <input type="range" min="0.333" max="1" step="0.001" value="${state.playerPlayback.speed||1}" data-speed-line="${li}"><span>${(state.playerPlayback.speed||1).toFixed(2)}×</span></div>`;
+                html += `<button type="button" class="player-mini-btn" data-prev-line="${li}" title="Попередній рядок">⏮</button>`;
+                html += `<button type="button" class="player-mini-btn" data-restart-line="${li}" title="Спочатку">↺</button>`;
+                html += `<button type="button" class="player-mini-btn" data-next-line="${li}" title="Наступний рядок">⏭</button>`;
+                html += `<div class="player-speed">Швидкість <input type="range" min="0.333" max="1" step="0.001" value="${state.playerPlayback.speed || 1}" data-speed-line="${li}"><span>${(state.playerPlayback.speed || 1).toFixed(2)}×</span></div>`;
                 html += `</div></div>`;
             }
             html += `</div>`;
         }
+
         container.innerHTML = html;
-        playerGroupCount.textContent = `${totalGroups} груп`;
+        playerGroupCount.textContent = `${totalNotes} нот`;
+
         container.querySelectorAll('.player-line-play').forEach(btn => {
-            btn.type='button';
-            btn.addEventListener('pointerup', e => { e.preventDefault(); e.stopPropagation(); const li=parseInt(btn.dataset.line); if(Number.isInteger(li)) togglePlayerLine(li); });
+            btn.addEventListener('click', e => {
+                e.preventDefault();
+                e.stopPropagation();
+                const li = parseInt(btn.dataset.linePlay, 10);
+                if (Number.isInteger(li)) togglePlayerLine(li);
+            });
         });
-        container.querySelectorAll('[data-prev-line]').forEach(btn => btn.addEventListener('click', ()=>switchPlayerLine(-1)));
-        container.querySelectorAll('[data-next-line]').forEach(btn => btn.addEventListener('click', ()=>switchPlayerLine(1)));
-        container.querySelectorAll('[data-restart-line]').forEach(btn => btn.addEventListener('click', ()=>playLineFrom(parseInt(btn.dataset.restartLine),0)));
-        container.querySelectorAll('[data-speed-line]').forEach(input => input.addEventListener('input', ()=>{
-            const v=parseFloat(input.value); state.playerPlayback.speed=v; input.nextElementSibling.textContent=v.toFixed(2)+'×';
+
+        container.querySelectorAll('[data-prev-line]').forEach(btn => btn.addEventListener('click', () => switchPlayerLine(-1)));
+        container.querySelectorAll('[data-next-line]').forEach(btn => btn.addEventListener('click', () => switchPlayerLine(1)));
+        container.querySelectorAll('[data-restart-line]').forEach(btn => btn.addEventListener('click', () => {
+            const li = parseInt(btn.dataset.restartLine, 10);
+            if (Number.isInteger(li)) playLineFrom(li, 0);
         }));
+
+        container.querySelectorAll('[data-speed-line]').forEach(input => input.addEventListener('input', () => {
+            const v = parseFloat(input.value);
+            state.playerPlayback.speed = v;
+            if (input.nextElementSibling) input.nextElementSibling.textContent = v.toFixed(2) + '×';
+        }));
+
         container.querySelectorAll('[data-seek-line]').forEach(track => {
-            const seek = e => { const r=track.getBoundingClientRect(); seekLinePlayer(parseInt(track.dataset.seekLine),(e.clientX-r.left)/r.width); };
-            track.addEventListener('pointerdown', e=>{ track.setPointerCapture?.(e.pointerId); seek(e); });
-            track.addEventListener('pointermove', e=>{ if(e.buttons) seek(e); });
+            const seek = e => {
+                const r = track.getBoundingClientRect();
+                const ratio = r.width ? (e.clientX - r.left) / r.width : 0;
+                seekLinePlayer(parseInt(track.dataset.seekLine, 10), ratio);
+            };
+            track.addEventListener('pointerdown', e => {
+                track.setPointerCapture?.(e.pointerId);
+                seek(e);
+            });
+            track.addEventListener('pointermove', e => {
+                if (e.buttons) seek(e);
+            });
         });
+
+        // Keep manual note preview on the lyric chips. It does not affect the
+        // stored melody or the player sequence.
         container.querySelectorAll('.player-chip').forEach(chip => {
-            const note = chip.dataset.note, groupId = chip.dataset.groupId;
-            if (!note) { chip.style.opacity='0.5'; chip.style.cursor='not-allowed'; chip.title='Немає ноти'; return; }
-            const startHold=e=>{ e.preventDefault(); if(state.holdingId===groupId)return; stopAllContinuous(); state.holdingId=groupId; chip.classList.add('holding'); startContinuousNote(note,groupId); };
-            const endHold=e=>{ e.preventDefault(); if(state.holdingId===groupId){ stopContinuousNote(groupId); chip.classList.remove('holding'); state.holdingId=null; } };
-            chip.addEventListener('mousedown',startHold); chip.addEventListener('mouseup',endHold); chip.addEventListener('mouseleave',endHold);
-            chip.addEventListener('touchstart',startHold,{passive:false}); chip.addEventListener('touchend',endHold,{passive:false}); chip.addEventListener('touchcancel',endHold,{passive:false});
+            const note = chip.dataset.note;
+            const groupId = `${chip.dataset.line}-${chip.dataset.group}`;
+            if (!note) {
+                chip.style.opacity = '0.65';
+                chip.title = 'До цієї групи ноту не прив’язано';
+                return;
+            }
+            const startHold = e => {
+                e.preventDefault();
+                if (state.holdingId === groupId) return;
+                stopAllContinuous();
+                state.holdingId = groupId;
+                chip.classList.add('holding');
+                startContinuousNote(note, groupId);
+            };
+            const endHold = e => {
+                e.preventDefault();
+                if (state.holdingId === groupId) {
+                    stopContinuousNote(groupId);
+                    chip.classList.remove('holding');
+                    state.holdingId = null;
+                }
+            };
+            chip.addEventListener('mousedown', startHold);
+            chip.addEventListener('mouseup', endHold);
+            chip.addEventListener('mouseleave', endHold);
+            chip.addEventListener('touchstart', startHold, { passive: false });
+            chip.addEventListener('touchend', endHold, { passive: false });
+            chip.addEventListener('touchcancel', endHold, { passive: false });
         });
-        if (state.playerPlayback.lineIdx !== null && state.playerPlayback.expanded !== null) setPlayerProgress(state.playerPlayback.lineIdx, state.playerPlayback.elapsed);
+
+        if (state.playerPlayback.lineIdx !== null && state.playerPlayback.expanded !== null) {
+            setPlayerProgress(state.playerPlayback.lineIdx, state.playerPlayback.elapsed);
+        }
     }
 
     function renderAll() {
@@ -3081,6 +3780,7 @@
                         id: n.id,
                         note: n.note,
                         d: n.duration,
+                        rb: n.restBefore || 0,
                         gi: Array.isArray(n.groupIdxs) ? n.groupIdxs : (n.groupIdx != null ? [n.groupIdx] : [])
                     }))
                 };
@@ -3106,13 +3806,16 @@
                 id: n.id || `n-share-${Date.now()}-${i}`,
                 note: n.note,
                 duration: n.d || 0.6,
+                restBefore: i === 0 ? 0 : Math.max(0, Number(n.rb) || 0),
                 groupIdxs: Array.isArray(n.gi) ? n.gi.filter(Number.isInteger) : (Number.isInteger(n.gi) ? [n.gi] : [])
             }));
             groups.forEach(g => { delete g._detectedNoteIds; delete g._detectedNoteId; });
             detectedNotes.forEach(n => {
                 n.groupIdxs.forEach(gi => {
                     if (!groups[gi]) return;
-                    groups[gi]._detectedNoteIds = [n.id];
+                    const ids = groupDetectedIds(groups[gi]);
+                    if (!ids.includes(n.id)) ids.push(n.id);
+                    groups[gi]._detectedNoteIds = ids;
                     groups[gi].note = n.note;
                     groups[gi].duration = n.duration;
                 });
@@ -3283,11 +3986,19 @@
             state.lines = [];
         }
 
-        state.lines = (state.lines || []).map(line => ({
-            ...line,
-            detectedNotes: line.detectedNotes || [],
-            notesCollapsed: !!line.notesCollapsed
-        }));
+        state.lines = (state.lines || []).map(line => {
+            const normalized = {
+                ...line,
+                detectedNotes: line.detectedNotes || [],
+                notesCollapsed: !!line.notesCollapsed
+            };
+            normalized.groups = (normalized.groups || []).map(g => ({
+                ...g,
+                _detectedNoteIds: groupDetectedIds(g)
+            }));
+            syncDetectedNoteLinks(normalized);
+            return normalized;
+        });
 
         // Restore saved volume (falls back to the 80% default already in state)
         try {
