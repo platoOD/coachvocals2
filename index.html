@@ -619,6 +619,7 @@
             min-height: 34px;
             padding: 4px 0 8px;
         }
+        .line-notes-strip.reverse-drop-target { outline: 2px dashed currentColor; outline-offset: -2px; }
         .line-notes-visual.notes-collapsed .line-notes-strip,
         .line-notes-visual.notes-collapsed .line-notes-connections {
             display: none;
@@ -2681,65 +2682,73 @@
 
     function setupGroupReverseDrag(lineIdx, chip, visual) {
         if (!chip || !visual) return;
+        chip.style.touchAction = 'none';
+        chip.style.userSelect = 'none';
+        chip.style.webkitUserSelect = 'none';
+
+        let drag = null;
+        const clearTargets = () => visual.querySelectorAll('.reverse-drop-target').forEach(el => el.classList.remove('reverse-drop-target'));
+
         chip.addEventListener('pointerdown', e => {
-            if (e.button !== undefined && e.button !== 0) return;
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
             if (e.target.closest('.action-btn, .note-badge')) return;
+
             const line = state.lines[lineIdx];
             const groupIdx = parseInt(chip.dataset.group, 10);
             const group = line?.groups?.[groupIdx];
-            if (!group || !groupDetectedIds(group).length) return;
+            const linkedIds = group ? groupDetectedIds(group) : [];
+            if (!group || !linkedIds.length) return;
+
             e.preventDefault();
             e.stopPropagation();
-            chip.style.touchAction = 'none';
+
             const r = chip.getBoundingClientRect();
+            const offsetX = e.clientX - r.left;
+            const offsetY = e.clientY - r.top;
             const ghost = chip.cloneNode(true);
             ghost.classList.add('group-drag-ghost');
-            ghost.style.position = 'fixed';
-            ghost.style.left = `${r.left}px`;
-            ghost.style.top = `${r.top}px`;
-            ghost.style.width = `${r.width}px`;
-            ghost.style.pointerEvents = 'none';
-            ghost.style.zIndex = '10000';
+            Object.assign(ghost.style, {
+                position: 'fixed', left: `${r.left}px`, top: `${r.top}px`,
+                width: `${r.width}px`, pointerEvents: 'none', zIndex: '10000'
+            });
             document.body.appendChild(ghost);
             chip.classList.add('drag-source');
+
+            drag = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, offsetX, offsetY, r, ghost, moved: false, groupIdx, linkedIds: linkedIds.slice() };
             try { chip.setPointerCapture(e.pointerId); } catch (_) {}
-            const pointerId = e.pointerId;
-            let moved = false;
-            const clearTargets = () => visual.querySelectorAll('.reverse-drop-target').forEach(el => el.classList.remove('reverse-drop-target'));
-            const move = ev => {
-                if (ev.pointerId !== pointerId) return;
-                const dx = ev.clientX - e.clientX, dy = ev.clientY - e.clientY;
-                if (!moved && Math.hypot(dx,dy) < 5) return;
-                moved = true;
-                ev.preventDefault();
-                ghost.style.left = `${ev.clientX - (r.width/2)}px`;
-                ghost.style.top = `${ev.clientY - (r.height/2)}px`;
-                clearTargets();
-                const under = document.elementFromPoint(ev.clientX, ev.clientY);
-                const noteEl = under?.closest?.('.detected-note');
-                if (noteEl && noteEl.closest('.line-block')?.dataset.line === String(lineIdx) && groupDetectedIds(group).includes(noteEl.dataset.noteId)) {
-                    noteEl.classList.add('reverse-drop-target');
-                }
-            };
-            const finish = ev => {
-                if (ev.pointerId !== pointerId) return;
-                document.removeEventListener('pointermove', move, true);
-                document.removeEventListener('pointerup', finish, true);
-                document.removeEventListener('pointercancel', finish, true);
-                clearTargets();
-                ghost.remove();
-                chip.classList.remove('drag-source');
-                try { chip.releasePointerCapture(pointerId); } catch (_) {}
-                const under = document.elementFromPoint(ev.clientX, ev.clientY);
-                const noteEl = under?.closest?.('.detected-note');
-                if (moved && noteEl && noteEl.closest('.line-block')?.dataset.line === String(lineIdx) && groupDetectedIds(group).includes(noteEl.dataset.noteId)) {
-                    detachDetectedNote(lineIdx, noteEl.dataset.noteId, groupIdx);
-                }
-            };
-            document.addEventListener('pointermove', move, true);
-            document.addEventListener('pointerup', finish, true);
-            document.addEventListener('pointercancel', finish, true);
         }, { passive: false });
+
+        chip.addEventListener('pointermove', e => {
+            if (!drag || e.pointerId !== drag.pointerId) return;
+            const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
+            if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+            drag.moved = true;
+            e.preventDefault();
+            drag.ghost.style.left = `${e.clientX - drag.offsetX}px`;
+            drag.ghost.style.top = `${e.clientY - drag.offsetY}px`;
+            clearTargets();
+            const under = document.elementFromPoint(e.clientX, e.clientY);
+            const strip = under?.closest?.('.line-notes-strip');
+            if (strip && strip.closest('.line-block')?.dataset.line === String(lineIdx)) strip.classList.add('reverse-drop-target');
+        }, { passive: false });
+
+        const finish = e => {
+            if (!drag || e.pointerId !== drag.pointerId) return;
+            const d = drag;
+            drag = null;
+            clearTargets();
+            if (d.moved) e.preventDefault();
+            d.ghost.remove();
+            chip.classList.remove('drag-source');
+            try { chip.releasePointerCapture(d.pointerId); } catch (_) {}
+
+            const under = document.elementFromPoint(e.clientX, e.clientY);
+            const strip = under?.closest?.('.line-notes-strip');
+            const validStrip = strip && strip.closest('.line-block')?.dataset.line === String(lineIdx);
+            if (d.moved && validStrip) d.linkedIds.forEach(noteId => detachDetectedNote(lineIdx, noteId, d.groupIdx));
+        };
+        chip.addEventListener('pointerup', finish, { passive: false });
+        chip.addEventListener('pointercancel', finish, { passive: false });
     }
 
     function renderDetectedNoteConnections(lineIdx, visual) {
